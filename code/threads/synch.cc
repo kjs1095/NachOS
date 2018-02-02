@@ -243,7 +243,7 @@ void Lock::Release()
 Condition::Condition(char* debugName)
 {
     name = debugName;
-    waitQueue = new List<Semaphore *>;
+    waitQueue = new List<Thread *>;
 }
 
 //----------------------------------------------------------------------
@@ -253,17 +253,21 @@ Condition::Condition(char* debugName)
 
 Condition::~Condition()
 {
+    ASSERT(waitQueue->IsEmpty());
     delete waitQueue;
 }
 
 //----------------------------------------------------------------------
 // Condition::Wait
 // 	Atomically release monitor lock and go to sleep.
-//	Our implementation uses semaphores to implement this, by
-//	allocating a semaphore for each waiting thread.  The signaller
-//	will V() this semaphore, so there is no chance the waiter
-//	will miss the signal, even though the lock is released before
-//	calling P().
+//  Step 1. do these operations below atomicity by diable/re-enable 
+//          interrupt.
+//    1.a Release the mutex
+//    1.b Move this running thread into wait-queue
+//    1.c Sleep this thread
+//
+//  Step 2. Once this thread is notified and resumed, the re-acquire 
+//          the mutex.
 //
 //	Note: we assume Mesa-style semantics, which means that the
 //	waiter must re-acquire the monitor lock when waking up.
@@ -273,16 +277,22 @@ Condition::~Condition()
 
 void Condition::Wait(Lock* conditionLock) 
 {
-     Semaphore *waiter;
+    ASSERT(conditionLock->IsHeldByCurrentThread());
     
-     ASSERT(conditionLock->IsHeldByCurrentThread());
+    Thread *currentThread = kernel->currentThread;
+    Interrupt *interrupt = kernel->interrupt;
+    // disable interrupt
+    IntStatus oldLevel = interrupt->SetLevel(IntOff);
+    
+    waitQueue->Append(currentThread);
 
-     waiter = new Semaphore("condition", 0);
-     waitQueue->Append(waiter);
-     conditionLock->Release();
-     waiter->P();
-     conditionLock->Acquire();
-     delete waiter;
+    conditionLock->Release();
+    currentThread->Sleep(FALSE);
+
+    // re-enable interrupt
+    (void) interrupt->SetLevel(oldLevel);    
+
+    conditionLock->Acquire();
 }
 
 //----------------------------------------------------------------------
@@ -302,14 +312,18 @@ void Condition::Wait(Lock* conditionLock)
 
 void Condition::Signal(Lock* conditionLock)
 {
-    Semaphore *waiter;
-    
     ASSERT(conditionLock->IsHeldByCurrentThread());
-    
+   
+    Interrupt *interrupt = kernel->interrupt;
+    // disable interrupt
+    IntStatus oldLevel = interrupt->SetLevel(IntOff);
+
     if (!waitQueue->IsEmpty()) {
-        waiter = waitQueue->RemoveFront();
-	waiter->V();
+        kernel->scheduler->ReadyToRun(waitQueue->RemoveFront()); 
     }
+
+    // re-enable interrupt
+    (void) interrupt->SetLevel(oldLevel);
 }
 
 //----------------------------------------------------------------------
