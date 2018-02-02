@@ -158,7 +158,8 @@ Semaphore::SelfTest()
 Lock::Lock(char* debugName)
 {
     name = debugName;
-    semaphore = new Semaphore("lock", 1);  // initially, unlocked
+    waitQueue = new List<Thread *>;
+    locked = FALSE;
     lockHolder = NULL;
 }
 
@@ -168,7 +169,9 @@ Lock::Lock(char* debugName)
 //----------------------------------------------------------------------
 Lock::~Lock()
 {
-    delete semaphore;
+    ASSERT(locked == FALSE);
+    ASSERT(waitQueue->IsEmpty());
+    delete waitQueue;
 }
 
 //----------------------------------------------------------------------
@@ -180,8 +183,24 @@ Lock::~Lock()
 
 void Lock::Acquire()
 {
-    semaphore->P();
-    lockHolder = kernel->currentThread;
+    Interrupt *interrupt = kernel->interrupt;
+    Thread *currentThread = kernel->currentThread;
+
+    ASSERT(locked == 0 || !IsHeldByCurrentThread());
+
+    // disable interrupt
+    IntStatus oldLevel = interrupt->SetLevel(IntOff);
+
+    while (locked == TRUE) {
+        waitQueue->Append(currentThread);
+        currentThread->Sleep(FALSE);        
+    }
+
+    locked = TRUE;
+    lockHolder = currentThread;
+
+    // re-enable interrupt
+    (void*) interrupt->SetLevel(oldLevel);
 }
 
 //----------------------------------------------------------------------
@@ -197,9 +216,20 @@ void Lock::Acquire()
 
 void Lock::Release()
 {
+    ASSERT(locked == TRUE);
     ASSERT(IsHeldByCurrentThread());
+    
+    Interrupt *interrupt = kernel->interrupt;
+    IntStatus oldLevel = interrupt->SetLevel(IntOff); // disable interrupt
+
+    if (!waitQueue->IsEmpty())
+        kernel->scheduler->ReadyToRun(waitQueue->RemoveFront());
+    
     lockHolder = NULL;
-    semaphore->V();
+    locked = FALSE;
+
+    // re-enable interrupt
+    (void*) interrupt->SetLevel(oldLevel);
 }
 
 //----------------------------------------------------------------------
