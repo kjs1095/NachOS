@@ -239,8 +239,10 @@ Scheduler::WakeUpSleepingThread()
 {   
     while (!sleepList->IsEmpty()) {
         if (sleepList->Front()->when <= kernel->stats->totalTicks) {
-            kernel->scheduler->ReadyToRun(
-                            sleepList->RemoveFront()->threadToWakeUp);
+            PendingThread *toWakeUp = sleepList->RemoveFront();
+            kernel->scheduler->ReadyToRun(toWakeUp->threadToWakeUp);
+            delete toWakeUp;
+            toWakeUp = NULL;
         } else { 
             break;
         }
