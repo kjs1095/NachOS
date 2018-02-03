@@ -64,6 +64,8 @@ const int StackSize = (4 * 1024);	// in words
 // Thread state
 enum ThreadStatus { JUST_CREATED, RUNNING, READY, BLOCKED };
 
+class Lock;
+class Condition;
 
 // The following class defines a "thread control block" -- which
 // represents a single thread of execution.
@@ -84,7 +86,8 @@ class Thread {
     void *machineState[MachineStateSize];  // all registers except for stackTop
 
   public:
-    Thread(char* debugName);		// initialize a Thread 
+    Thread(char* debugName, bool isJoinable = FALSE);
+                    // initialize a Thread 
     ~Thread(); 				// deallocate a Thread
 					// NOTE -- thread being deleted
 					// must not be running when delete 
@@ -98,6 +101,7 @@ class Thread {
 				// other thread is runnable
     void Sleep(bool finishing); // Put the thread to sleep and 
 				// relinquish the processor
+    void Join();        // Allow parent thread to wait until child finished
     void Begin();		// Startup code for the thread	
     void Finish();  		// The thread is done executing
     
@@ -119,6 +123,15 @@ class Thread {
     void StackAllocate(VoidFunctionPtr func, void *arg);
     				// Allocate a stack for thread.
 				// Used internally by Fork()
+    bool isJoinable;
+    Lock *joinLock;
+    Condition *joinWait;
+    Condition *finishWait;
+    Condition *deleteWait;
+    bool finishCalled;
+    bool joinCalled;
+    bool forkCalled;
+    bool readyToFinish;
 
 #ifdef USER_PROGRAM
 // A thread running a user program actually has *two* sets of CPU registers -- 

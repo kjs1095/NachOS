@@ -33,7 +33,7 @@ const int STACK_FENCEPOST = 0xdedbeef;
 //	"threadName" is an arbitrary string, useful for debugging.
 //----------------------------------------------------------------------
 
-Thread::Thread(char* threadName)
+Thread::Thread(char* threadName, bool isJoinable)
 {
     name = threadName;
     stackTop = NULL;
@@ -44,6 +44,15 @@ Thread::Thread(char* threadName)
 					// new thread ignores contents 
 					// of machine registers
     }
+    this->isJoinable = isJoinable;
+    joinLock = new Lock("Join lock");
+    joinWait = new Condition("Join() called CV");
+    finishWait = new Condition("Finish() called CV");
+    deleteWait = new Condition("Permition to delete CV");
+    joinCalled = false;
+    finishCalled = false;
+    forkCalled = false;
+    readyToFinish = false;
 #ifdef USER_PROGRAM
     space = NULL;
 #endif
@@ -66,6 +75,12 @@ Thread::~Thread()
     DEBUG(dbgThread, "Deleting thread: " << name);
 
     ASSERT(this != kernel->currentThread);
+    
+    delete joinLock;
+    delete joinWait;
+    delete finishWait;
+    delete deleteWait;
+
     if (stack != NULL)
 	DeallocBoundedArray((char *) stack, StackSize * sizeof(int));
 }
@@ -104,6 +119,8 @@ Thread::Fork(VoidFunctionPtr func, void *arg)
     oldLevel = interrupt->SetLevel(IntOff);
     scheduler->ReadyToRun(this);	// ReadyToRun assumes that interrupts 
 					// are disabled!
+
+    forkCalled = TRUE;
     (void) interrupt->SetLevel(oldLevel);
 }    
 
@@ -178,8 +195,28 @@ Thread::Finish ()
     
     DEBUG(dbgThread, "Finishing thread: " << name);
     
+    joinLock->Acquire();
+    finishCalled = TRUE;
+
+    while (!joinCalled && isJoinable) {
+        joinWait->Wait(joinLock);
+    }
+
+    finishWait->Signal(joinLock);
+
+    while (!readyToFinish && isJoinable) {
+        deleteWait->Wait(joinLock);
+    }
+
+    joinLock->Release();
+
+    if (isJoinable) {
+        DEBUG(dbgThread, "Wholly finishing thread after Join() called: " << name);
+    }
+
     Sleep(TRUE);				// invokes SWITCH
     // not reached
+    ASSERTNOTREACHED();
 }
 
 //----------------------------------------------------------------------
@@ -254,6 +291,37 @@ Thread::Sleep (bool finishing)
     
     // returns when it's time for us to run
     kernel->scheduler->Run(nextThread, finishing); 
+}
+
+//----------------------------------------------------------------------
+// Thread::Join
+//  Called by parent thread to allow parent to wait until child is 
+//  terminated.
+//----------------------------------------------------------------------
+
+void 
+Thread::Join () 
+{
+    ASSERT(this != kernel->currentThread);
+    ASSERT(isJoinable == TRUE);
+    ASSERT(joinCalled == FALSE);
+    ASSERT(forkCalled == TRUE);
+
+    DEBUG(dbgThread , "Joining thread: " << name);
+
+    joinLock->Acquire();
+    joinCalled = TRUE;
+    
+    while (!finishCalled) {
+        finishWait->Wait(joinLock);
+    }
+    
+    joinWait->Signal(joinLock);
+
+    readyToFinish = TRUE;
+    deleteWait->Signal(joinLock);
+    
+    joinLock->Release(); 
 }
 
 //----------------------------------------------------------------------
