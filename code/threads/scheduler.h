@@ -13,6 +13,19 @@
 #include "list.h"
 #include "thread.h"
 
+// The following class defines a thread that is waked up in
+// the future.  The internal data structures are left public 
+// to make it simpler to manipulate.
+
+class PendingThread {
+  public:
+    PendingThread(Thread *threadToWakeUp, int time);
+                                // initial a thread that will be wake 
+                                // up in the future
+    Thread *threadToWakeUp;
+    int when;   // when the thread is supposed to wake up
+};
+
 // The following class defines the scheduler/dispatcher abstraction -- 
 // the data structures and operations needed to keep track of which 
 // thread is running, and which threads are ready but not running.
@@ -33,10 +46,17 @@ class Scheduler {
     void Print();		// Print contents of ready list
     
     // SelfTest for scheduler is implemented in class Thread
-    
+
+    void SetSleep(int sleepTime);   // suspend execution 
+                    // until time > now + sleepTime
+    void WakeUpSleepingThread();    // called to wake up threads
+                    // if any when interrupt occured
+    bool IsSleepListEmpty() { return sleepList->IsEmpty(); }
+
   private:
     List<Thread *> *readyList;  // queue of threads that are ready to run,
 				// but not running
+    SortedList<PendingThread *> *sleepList;
     Thread *toBeDestroyed;	// finishing thread to be destroyed
     				// by the next thread that runs
 };

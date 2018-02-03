@@ -26,6 +26,17 @@ Alarm::Alarm(bool doRandom)
 }
 
 //----------------------------------------------------------------------
+// Alarm::WaitUntil
+//
+//  "x" is the amount of time should be suspended
+//----------------------------------------------------------------------
+
+void Alarm::WaitUntil(int x) 
+{
+    kernel->scheduler->SetSleep(x);
+}
+
+//----------------------------------------------------------------------
 // Alarm::CallBack
 //	Software interrupt handler for the timer device. The timer device is
 //	set up to interrupt the CPU periodically (once every TimerTicks).
@@ -51,12 +62,14 @@ Alarm::CallBack()
 {
     Interrupt *interrupt = kernel->interrupt;
     MachineStatus status = interrupt->getStatus();
-    
-    if (status == IdleMode) {	// is it time to quit?
+    bool isSleepListEmpty = kernel->scheduler->IsSleepListEmpty();
+
+    if (status == IdleMode && isSleepListEmpty) {	// is it time to quit?
         if (!interrupt->AnyFutureInterrupts()) {
 	    timer->Disable();	// turn off the timer
 	}
     } else {			// there's someone to preempt
-	interrupt->YieldOnReturn();
+	kernel->scheduler->WakeUpSleepingThread();
+    interrupt->YieldOnReturn();
     }
 }

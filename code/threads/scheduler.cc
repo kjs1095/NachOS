@@ -24,6 +24,34 @@
 #include "main.h"
 
 //----------------------------------------------------------------------
+// PendingThread::PendingThread
+//  Initialize a thread that is to be waked up in the future.
+//
+//  "theadToWakeUp" is the thread to wake up when times up
+//  "time" is when (in simulation time) to wake up thread
+//----------------------------------------------------------------------
+
+PendingThread::PendingThread(Thread *threadToWakeUp, int time) 
+{   
+    ASSERT(time >= 0);
+    this->threadToWakeUp = threadToWakeUp;
+    when = time;   
+}
+
+//----------------------------------------------------------------------
+// PendingCompare
+//  Compare to threads based on which should wake up first.
+//----------------------------------------------------------------------
+
+static int
+PendingCompare (PendingThread *x, PendingThread *y)
+{   
+    if (x->when < y->when) { return -1; } 
+    else if (x->when > y->when) { return 1; }
+    else { return 0; }
+}
+
+//----------------------------------------------------------------------
 // Scheduler::Scheduler
 // 	Initialize the list of ready but not running threads.
 //	Initially, no ready threads.
@@ -32,6 +60,7 @@
 Scheduler::Scheduler()
 { 
     readyList = new List<Thread *>; 
+    sleepList = new SortedList<PendingThread* >(PendingCompare);
     toBeDestroyed = NULL;
 } 
 
@@ -42,6 +71,10 @@ Scheduler::Scheduler()
 
 Scheduler::~Scheduler()
 { 
+    ASSERT(readyList->IsEmpty());
+    ASSERT(sleepList->IsEmpty());
+    
+    delete sleepList;
     delete readyList; 
 } 
 
@@ -168,6 +201,50 @@ Scheduler::CheckToBeDestroyed()
         delete toBeDestroyed;
 	toBeDestroyed = NULL;
     }
+}
+
+//----------------------------------------------------------------------
+// Scheduler::SetSleep
+//
+//  "sleepTime" is the amount of time should be suspended
+//----------------------------------------------------------------------
+void 
+Scheduler::SetSleep(int sleepTime) 
+{
+    ASSERT(sleepTime > 0);
+
+    Thread *currentThread = kernel->currentThread;
+    Interrupt *interrupt = kernel->interrupt;    
+
+    // disable interrupt   
+    IntStatus oldLevel = interrupt->SetLevel(IntOff);
+
+    int when = kernel->stats->totalTicks + sleepTime;
+    PendingThread *toWakeUp = new PendingThread(currentThread, when);
+    
+    sleepList->Insert(toWakeUp); 
+    currentThread->Sleep(FALSE);
+
+    // re-enable interrupt
+    (void*) interrupt->SetLevel(oldLevel);
+}
+
+//----------------------------------------------------------------------
+// Scheduler::WakeUpSleepingThread
+//  Wake up threads in sleepList should be waked up.
+//  This method is called when an interrupt occured. 
+//----------------------------------------------------------------------
+void
+Scheduler::WakeUpSleepingThread()
+{   
+    while (!sleepList->IsEmpty()) {
+        if (sleepList->Front()->when <= kernel->stats->totalTicks) {
+            kernel->scheduler->ReadyToRun(
+                            sleepList->RemoveFront()->threadToWakeUp);
+        } else { 
+            break;
+        }
+    }   
 }
  
 //----------------------------------------------------------------------
