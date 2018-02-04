@@ -30,6 +30,7 @@
 #define SC_ThreadFork	9
 #define SC_ThreadYield	10
 #define SC_PrintInt 11
+#define SC_PrintChar    12
 
 #ifndef IN_ASM
 
@@ -129,6 +130,9 @@ void ThreadYield();
 
 /* Write integer to console */
 void PrintInt(int integer);
+
+/* Write char to console */
+void PrintChar(char ch);
 
 #endif /* IN_ASM */
 

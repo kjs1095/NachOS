@@ -2,10 +2,6 @@
 nachos
 swtch.s
 
-code/test/
-!code/test/*.c
-!code/test/script
-
 code/bin/coff2noff
 
 .DS_Store

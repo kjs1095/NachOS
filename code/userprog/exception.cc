@@ -71,6 +71,16 @@ ExceptionHandler(ExceptionType which)
             kernel->machine->WriteRegister(PCReg, kernel->machine->ReadRegister(NextPCReg));
             kernel->machine->WriteRegister(NextPCReg, kernel->machine->ReadRegister(PCReg) +4);            
             return;
+        case SC_PrintChar:
+            arg1 = kernel->machine->ReadRegister(4);
+            DEBUG(dbgAddr, "Print char to console\n");
+            kernel->synchConsoleOutput->PutChar((char)arg1);    
+
+            // Increment the pc before returning.
+            kernel->machine->WriteRegister(PrevPCReg, kernel->machine->ReadRegister(PCReg));
+            kernel->machine->WriteRegister(PCReg, kernel->machine->ReadRegister(NextPCReg));
+            kernel->machine->WriteRegister(NextPCReg, kernel->machine->ReadRegister(PCReg) +4);
+            return;
 		default:
 		    cerr << "Unexpected system call " << type << "\n";
  		    break;
