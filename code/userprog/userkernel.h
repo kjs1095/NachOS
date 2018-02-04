@@ -15,6 +15,9 @@
 #include "kernel.h"
 #include "filesys.h"
 #include "machine.h"
+ 
+#define NumMaxUserProgram  5   // Maximum #user programs 
+                            // can be executed in NachOS
 
 class SynchConsoleInput;
 class SynchConsoleOutput;
@@ -39,6 +42,9 @@ class UserProgKernel : public ThreadedKernel {
 
   private:
     bool debugUserProg;		// single step user program
+    Thread *userThread[NumMaxUserProgram];
+    char *executeFile[NumMaxUserProgram];
+    int numUserProgram;
 };
 
 #endif

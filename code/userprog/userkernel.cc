@@ -20,9 +20,14 @@ UserProgKernel::UserProgKernel(int argc, char **argv)
 		: ThreadedKernel(argc, argv)
 {
     debugUserProg = FALSE;
+    numUserProgram = 0;
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-s") == 0) {
 	    debugUserProg = TRUE;
+        } else if (strcmp(argv[i], "-e") == 0) {
+            ASSERT(i + 1 < argc);
+            executeFile[numUserProgram] = argv[i +1];
+            ++numUserProgram, ++i;
         } else if (strcmp(argv[i], "-u") == 0) {
             cout << "Partial usage: nachos [-s]\n";
 	}
@@ -60,6 +65,17 @@ UserProgKernel::~UserProgKernel()
 }
 
 //----------------------------------------------------------------------
+// UserProgKernel::ForkExecute
+//  Run user program, executable file path is the nane of thread
+//----------------------------------------------------------------------
+static void
+ForkExecute(Thread *t)
+{
+    DEBUG(dbgThread, "Path of executable file: " << t->getName());
+    t->space->Execute(t->getName());
+}
+
+//----------------------------------------------------------------------
 // UserProgKernel::Run
 // 	Run the Nachos kernel.  For now, just run the "halt" program. 
 //----------------------------------------------------------------------
@@ -67,9 +83,12 @@ UserProgKernel::~UserProgKernel()
 void
 UserProgKernel::Run()
 {
-    AddrSpace *halt = new AddrSpace();
-
-    halt->Execute("../test/halt");
+    DEBUG(dbgThread, "#User Program: " << numUserProgram);
+    for (int i = 0; i < numUserProgram; ++i) {
+        userThread[i] = new Thread(executeFile[i]);
+        userThread[i]->space = new AddrSpace();
+        userThread[i]->Fork((VoidFunctionPtr)ForkExecute, (void *) userThread[i]);
+    }
 
     ThreadedKernel::Run();
 }
