@@ -29,6 +29,7 @@
 #define SC_Close	8
 #define SC_ThreadFork	9
 #define SC_ThreadYield	10
+#define SC_PrintInt 11
 
 #ifndef IN_ASM
 
@@ -83,8 +84,8 @@ typedef int OpenFileId;
  * the console device.
  */
 
-#define ConsoleInput	0  
-#define ConsoleOutput	1  
+#define SysCallConsoleInput	    0  
+#define SysCallConsoleOutput	1  
  
 /* Create a Nachos file, with "name" */
 void Create(char *name);
@@ -125,6 +126,9 @@ void ThreadFork(void (*func)());
  * or not. 
  */
 void ThreadYield();		
+
+/* Write integer to console */
+void PrintInt(int integer);
 
 #endif /* IN_ASM */
 

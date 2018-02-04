@@ -107,6 +107,23 @@ SynchConsoleOutput::PutChar(char ch)
     lock->Release();
 }
 
+void
+SynchConsoleOutput::PutInt(int integer)
+{
+    lock->Acquire();
+
+    char *p = new char[12];
+    sprintf(p, "%d", integer);
+    for (int i = 0; p[i] != '\0'; ++i) {
+        consoleOutput->PutChar(p[i]);
+        waitFor->P();
+    }
+    delete p;
+    p = NULL;
+
+    lock->Release();
+}
+
 //----------------------------------------------------------------------
 // SynchConsoleOutput::CallBack
 //      Interrupt handler called when it's safe to send the next 

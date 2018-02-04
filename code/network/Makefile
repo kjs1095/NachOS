@@ -1754,7 +1754,9 @@ exception.o: ../userprog/exception.cc ../lib/copyright.h \
  ../filesys/filesys.h ../filesys/openfile.h ../threads/scheduler.h \
  ../lib/list.h ../lib/debug.h ../lib/list.cc ../machine/interrupt.h \
  ../machine/callback.h ../machine/stats.h ../threads/alarm.h \
- ../machine/callback.h ../machine/timer.h ../userprog/syscall.h
+ ../machine/callback.h ../machine/timer.h ../userprog/syscall.h \
+ ../userprog/synchconsole.h ../machine/console.h ../threads/synch.h \
+ ../threads/main.h
 synchconsole.o: ../userprog/synchconsole.cc ../lib/copyright.h \
  ../userprog/synchconsole.h ../lib/utility.h ../lib/copyright.h \
  ../machine/callback.h ../machine/console.h ../machine/callback.h \

@@ -24,6 +24,7 @@
 #include "copyright.h"
 #include "main.h"
 #include "syscall.h"
+#include "synchconsole.h"
 
 //----------------------------------------------------------------------
 // ExceptionHandler
@@ -52,7 +53,7 @@ void
 ExceptionHandler(ExceptionType which)
 {
     int type = kernel->machine->ReadRegister(2);
-
+    int arg1;
     switch (which) {
 	case SyscallException:
 	    switch(type) {
@@ -60,6 +61,16 @@ ExceptionHandler(ExceptionType which)
 		    DEBUG(dbgAddr, "Shutdown, initiated by user program.\n");
    		    kernel->interrupt->Halt();
 		    break;
+        case SC_PrintInt:
+            arg1 = kernel->machine->ReadRegister(4);
+            DEBUG(dbgAddr, "Print integer to console\n");
+            kernel->synchConsoleOutput->PutInt(arg1);            
+
+            // Increment the pc before returning.
+            kernel->machine->WriteRegister(PrevPCReg, kernel->machine->ReadRegister(PCReg));
+            kernel->machine->WriteRegister(PCReg, kernel->machine->ReadRegister(NextPCReg));
+            kernel->machine->WriteRegister(NextPCReg, kernel->machine->ReadRegister(PCReg) +4);            
+            return;
 		default:
 		    cerr << "Unexpected system call " << type << "\n";
  		    break;

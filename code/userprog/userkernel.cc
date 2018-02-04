@@ -41,6 +41,8 @@ UserProgKernel::Initialize()
 
     machine = new Machine(debugUserProg);
     fileSystem = new FileSystem();
+    synchConsoleInput = new SynchConsoleInput(NULL);
+    synchConsoleOutput = new SynchConsoleOutput(NULL);
 }
 
 //----------------------------------------------------------------------
@@ -51,6 +53,8 @@ UserProgKernel::Initialize()
 
 UserProgKernel::~UserProgKernel()
 {
+    delete synchConsoleInput;
+    delete synchConsoleOutput;
     delete fileSystem;
     delete machine;
 }
@@ -77,7 +81,7 @@ UserProgKernel::Run()
 
 void
 UserProgKernel::SelfTest() {
-    char ch;
+/*    char ch;
 
     ThreadedKernel::SelfTest();
 
@@ -98,5 +102,10 @@ UserProgKernel::SelfTest() {
 
     cout << "\n";
 
+    delete input;
+    delete output;
+
+    input = NULL;
+    output = NULL;*/
     // self test for running user programs is to run the halt program above
 }
