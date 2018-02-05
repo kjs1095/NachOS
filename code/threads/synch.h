@@ -142,4 +142,39 @@ class Condition {
     char* name;
     List<Thread *> *waitQueue;	// list of waiting threads
 };
+
+// The following class defines a "mailbox".  A mailbox can 
+// synchronously send and receive one word of messages.
+// These are only operations on a mailbox:
+//
+//  Send(int message) -- atomically waits until Receive(int* message) 
+//      is called on the same mailbox; and then copies the message into
+//      the Receive buffer.
+//
+//  Receive(int* message) -- atomically waits until Send(int message)
+//      is called on the same mailbox; and then copies the message into
+//      buffer
+// 
+
+class Mailbox {
+  public:
+    Mailbox(char* debugName);   // Initialize the mailbox with no 
+                            // sender and receiver
+    ~Mailbox();     // Deallocate the mailbox
+    char* getName() { return (name); }    
+                    // Debugging assist
+
+    void Send(int message);
+    void Receive(int *message);
+
+  private:
+    char* name;
+    int buffer;
+    int numRecvCalled;     // #Receive function calls have been made
+    bool bufferWritable;    // Indicate whether the buffer is wriable or not
+
+    Lock *mbLock;
+    Condition *recvWait;
+    Condition *sendWait;
+};
 #endif // SYNCH_H

@@ -339,3 +339,87 @@ void Condition::Broadcast(Lock* conditionLock)
         Signal(conditionLock);
     }
 }
+
+//----------------------------------------------------------------------
+// MailBox::MailBox
+//  Initialize a mailbox
+//
+// "debugName" -- name for debug purpose
+//----------------------------------------------------------------------
+
+Mailbox::Mailbox(char* debugName)
+{
+    name = debugName;
+    bufferWritable = TRUE;  // Indicate the buffer is writable or not
+    numRecvCalled = 0;     // #Receive(int* message) called
+    
+    mbLock = new Lock("Lock for mailbox"); 
+    sendWait = new Condition("CV for waiting Send");
+    recvWait = new Condition("CV for waiting Receive"); 
+}
+
+//----------------------------------------------------------------------
+// MailBox::~MailBox
+//  Deallocate the mailbox
+//----------------------------------------------------------------------
+Mailbox::~Mailbox()
+{
+    delete mbLock;
+    delete sendWait;
+    delete recvWait;
+}
+
+//----------------------------------------------------------------------
+// MailBox::Send
+//  Step 1. Wait until the buffer is writable or any Receive is called.
+//  Step 2. Put message in the buffer and set the buffer to be not 
+//          writable. 
+//
+// "message" is the message to be passed.
+//----------------------------------------------------------------------
+
+void Mailbox::Send(int message)
+{
+    mbLock->Acquire();
+
+    while (bufferWritable == FALSE || numRecvCalled == 0) {
+        sendWait->Wait(mbLock);
+    }
+    
+    buffer = message;
+    bufferWritable = FALSE;
+    
+    recvWait->Signal(mbLock);    
+    mbLock->Release();
+}
+
+//----------------------------------------------------------------------
+// MailBox::Receive
+//  Step 1. Increment #Receive calls
+//  Step 2. Wake sleeping Send up if any
+//  Step 3. Wait until buffer is not writable
+//  Step 4. Place the message in buffer into the buffer passed in as 
+//          parameter
+//  Step 5. Set the inner buffer to become writable and decrement
+//          #Receive calls
+//
+// "message" pointer to external method that message would pass into
+//----------------------------------------------------------------------
+
+void Mailbox::Receive(int* message)
+{
+    mbLock->Acquire();
+
+    numRecvCalled++;
+    sendWait->Signal(mbLock);
+
+    while (bufferWritable == TRUE) {
+        recvWait->Wait(mbLock);
+    }
+
+    *message = buffer;
+    numRecvCalled--;
+    bufferWritable = TRUE;
+
+    mbLock->Release();
+}
