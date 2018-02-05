@@ -377,5 +377,5 @@ SortedList<T>::SelfTest(T *p, int numEntries)
      }
      SanityCheck();
 
-     delete q;
+     delete[] q;
 }

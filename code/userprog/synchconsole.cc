@@ -118,7 +118,7 @@ SynchConsoleOutput::PutInt(int integer)
         consoleOutput->PutChar(p[i]);
         waitFor->P();
     }
-    delete p;
+    delete[] p;
     p = NULL;
 
     lock->Release();

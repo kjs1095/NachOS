@@ -134,7 +134,7 @@ ElevatorBank::~ElevatorBank() {
     for (int i = 0; i < numElevators; i++) {
         delete elevators[i];
     }
-    delete elevators;
+    delete[] elevators;
 }
         
 //----------------------------------------------------------------------
