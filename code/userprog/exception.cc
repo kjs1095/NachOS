@@ -61,6 +61,12 @@ ExceptionHandler(ExceptionType which)
 		    DEBUG(dbgAddr, "Shutdown, initiated by user program.\n");
    		    kernel->interrupt->Halt();
 		    break;
+        case SC_Exit:
+            arg1 = kernel->machine->ReadRegister(4);
+            DEBUG(dbgAddr, "Exit wit return value: " << arg1 << ", initiated by user program.\n");
+            kernel->currentThread->Finish();
+
+            return;
         case SC_PrintInt:
             arg1 = kernel->machine->ReadRegister(4);
             DEBUG(dbgAddr, "Print integer to console\n");

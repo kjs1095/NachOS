@@ -41,7 +41,7 @@ UserProgKernel::Initialize()
 
     machine = new Machine(debugUserProg);
     fileSystem = new FileSystem();
-    synchConsoleInput = new SynchConsoleInput(NULL);
+    synchConsoleInput = NULL;
     synchConsoleOutput = new SynchConsoleOutput(NULL);
 }
 
