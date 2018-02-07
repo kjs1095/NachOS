@@ -15,6 +15,8 @@
 
 #include "copyright.h"
 
+#define MAX_FILE_NAME_LENGTH 255
+
 /* system call codes -- used by the stubs to tell the kernel which system call
  * is being asked for
  */
@@ -88,8 +90,10 @@ typedef int OpenFileId;
 #define SysCallConsoleInput	    0  
 #define SysCallConsoleOutput	1  
  
-/* Create a Nachos file, with "name" */
-void Create(char *name);
+/* Create a Nachos file, with "name", and return 0 if succeeded, 
+ * otherwise return -1. 
+ */
+int Create(char *name);
 
 /* Open the Nachos file "name", and return an "OpenFileId" that can 
  * be used to read and write to the file.

@@ -27,6 +27,45 @@
 #include "synchconsole.h"
 
 //----------------------------------------------------------------------
+// ReadStringFromMemory
+//
+//  Returns length of string
+//
+// "addr" -- the virtual address to read from
+// "size" -- max length of string can be read
+// "buf" -- the place to write the result
+//----------------------------------------------------------------------
+
+int ReadStringFromMemory(int addr, int size, char *buf)
+{
+    int bufSize = 0;
+    for (int i = 0; ; ++i) {
+        if (i >= size)
+            break;
+        if (kernel->machine->mainMemory[addr + i] == '\0')
+            break;
+
+        *(buf + bufSize) = kernel->machine->mainMemory[addr + i];
+        ++bufSize;
+    }
+    buf[bufSize] = '\0';
+
+    return bufSize;
+}
+
+//----------------------------------------------------------------------
+// AdvancePC
+//  Advance program counter
+//----------------------------------------------------------------------
+
+void AdvancePC()
+{
+    kernel->machine->WriteRegister(PrevPCReg, kernel->machine->ReadRegister(PCReg));
+    kernel->machine->WriteRegister(PCReg, kernel->machine->ReadRegister(NextPCReg));
+    kernel->machine->WriteRegister(NextPCReg, kernel->machine->ReadRegister(PCReg) + sizeof(int));
+}
+
+//----------------------------------------------------------------------
 // ExceptionHandler
 // 	Entry point into the Nachos kernel.  Called when a user program
 //	is executing, and either does a syscall, or generates an addressing
@@ -54,6 +93,9 @@ ExceptionHandler(ExceptionType which)
 {
     int type = kernel->machine->ReadRegister(2);
     int arg1;
+    char* buf;
+    int bufSize;
+
     switch (which) {
 	case SyscallException:
 	    switch(type) {
@@ -67,15 +109,31 @@ ExceptionHandler(ExceptionType which)
             kernel->currentThread->Finish();
 
             return;
+        case SC_Create:
+            arg1 = kernel->machine->ReadRegister(4);
+            buf = new char[MAX_FILE_NAME_LENGTH];
+            bufSize = ReadStringFromMemory(arg1, MAX_FILE_NAME_LENGTH, buf);
+
+            if (kernel->fileSystem->Create(buf) == TRUE) {
+                DEBUG(dbgAddr, "Create file: " << buf << " succeed.\n");
+                kernel->machine->WriteRegister(2, 0);
+            } else {
+                DEBUG(dbgAddr, "Create file: " << buf << " failed.\n");
+                kernel->machine->WriteRegister(2, -1);
+            }
+
+            delete[] buf;
+
+            // Increment the pc before returning.
+            AdvancePC();
+            return;
         case SC_PrintInt:
             arg1 = kernel->machine->ReadRegister(4);
             DEBUG(dbgAddr, "Print integer to console\n");
             kernel->synchConsoleOutput->PutInt(arg1);            
 
             // Increment the pc before returning.
-            kernel->machine->WriteRegister(PrevPCReg, kernel->machine->ReadRegister(PCReg));
-            kernel->machine->WriteRegister(PCReg, kernel->machine->ReadRegister(NextPCReg));
-            kernel->machine->WriteRegister(NextPCReg, kernel->machine->ReadRegister(PCReg) +4);            
+            AdvancePC();
             return;
         case SC_PrintChar:
             arg1 = kernel->machine->ReadRegister(4);
@@ -83,9 +141,7 @@ ExceptionHandler(ExceptionType which)
             kernel->synchConsoleOutput->PutChar((char)arg1);    
 
             // Increment the pc before returning.
-            kernel->machine->WriteRegister(PrevPCReg, kernel->machine->ReadRegister(PCReg));
-            kernel->machine->WriteRegister(PCReg, kernel->machine->ReadRegister(NextPCReg));
-            kernel->machine->WriteRegister(NextPCReg, kernel->machine->ReadRegister(PCReg) +4);
+            AdvancePC();
             return;
 		default:
 		    cerr << "Unexpected system call " << type << "\n";
