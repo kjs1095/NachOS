@@ -500,6 +500,32 @@ Thread::AddOpenFileEntry(OpenFile *newOpenfile)
     return -1;
 }
 
+//----------------------------------------------------------------------
+// Thread::RemoveOpenFileEntry
+//  Remove OpenFile from user file table by file descriptor
+//
+// Return TRUE, if success. FALSE, otherwise.  
+//
+// "fd" is the file descriptor of open file would remove from file table
+//----------------------------------------------------------------------
+
+bool 
+Thread::RemoveOpenFileEntry(int fd) 
+{
+    if (fd < 0 || fd >= MaxNumUserOpenFiles) {
+        return FALSE;
+    } else if (openFileTable[fd]->inUse == FALSE) {
+        return FALSE;
+    } else {    // fd is legal value and entry is in use 
+        openFileTable[fd]->inUse = FALSE;
+        if (openFileTable[fd]->openFile != NULL)
+            delete openFileTable[fd]->openFile;
+        openFileTable[fd]->openFile = NULL;
+
+        return TRUE;
+    }   
+}
+
 #endif
 
 //----------------------------------------------------------------------

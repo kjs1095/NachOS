@@ -60,7 +60,7 @@ ExceptionHandler(ExceptionType which)
     char* buf;
     int bufSize;
     OpenFile *openFilePtr;
-    OpenFileId userFd, kernelFd;
+    OpenFileId userFd;
 
     switch (which) {
 	case SyscallException:
@@ -139,6 +139,17 @@ ExceptionHandler(ExceptionType which)
             }
             delete[] buf;
  
+            // Increment the pc before returning.
+            AdvancePC();
+            return;
+        case SC_Close:
+            arg1 = kernel->machine->ReadRegister(4);
+            if (kernel->currentThread->RemoveOpenFileEntry(arg1) == TRUE) {
+                DEBUG(dbgAddr, "Close file by file descriptor: " << arg1);
+            } else {
+                DEBUG(dbgAddr, "Fail to close file by file descriptor: " << arg1);
+            }
+
             // Increment the pc before returning.
             AdvancePC();
             return;

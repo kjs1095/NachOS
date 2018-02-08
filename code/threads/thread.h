@@ -162,6 +162,7 @@ class Thread {
     void RestoreUserState();		// restore user-level register state
 
     int AddOpenFileEntry(OpenFile *newOpenFile);
+    bool RemoveOpenFileEntry(int fd);
 
     AddrSpace *space;			// User code this thread is running.
 #endif
