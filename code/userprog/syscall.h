@@ -15,7 +15,7 @@
 
 #include "copyright.h"
 
-#define MAX_FILE_NAME_LENGTH 255
+#define MaxFileNameLength 255
 
 /* system call codes -- used by the stubs to tell the kernel which system call
  * is being asked for

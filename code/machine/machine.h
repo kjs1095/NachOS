@@ -99,6 +99,12 @@ class Machine {
     void WriteRegister(int num, int value);
 				// store a value into a CPU register
 
+    bool ReadMem(int addr, int size, int* value);
+    bool WriteMem(int addr, int size, int value);
+    				// Read or write 1, 2, or 4 bytes of virtual 
+				// memory (at addr).  Return FALSE if a 
+				// correct translation couldn't be found.
+
 // Data structures accessible to the Nachos kernel -- main memory and the
 // page table/TLB.
 //
@@ -140,12 +146,6 @@ class Machine {
 
     void OneInstruction(Instruction *instr); 	
     				// Run one instruction of a user program.
-    
-    bool ReadMem(int addr, int size, int* value);
-    bool WriteMem(int addr, int size, int value);
-    				// Read or write 1, 2, or 4 bytes of virtual 
-				// memory (at addr).  Return FALSE if a 
-				// correct translation couldn't be found.
 
     ExceptionType Translate(int virtAddr, int* physAddr, int size,bool writing);
     				// Translate an address, and check for 

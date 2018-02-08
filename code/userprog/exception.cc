@@ -26,44 +26,8 @@
 #include "syscall.h"
 #include "synchconsole.h"
 
-//----------------------------------------------------------------------
-// ReadStringFromMemory
-//
-//  Returns length of string
-//
-// "addr" -- the virtual address to read from
-// "size" -- max length of string can be read
-// "buf" -- the place to write the result
-//----------------------------------------------------------------------
-
-int ReadStringFromMemory(int addr, int size, char *buf)
-{
-    int bufSize = 0;
-    for (int i = 0; ; ++i) {
-        if (i >= size)
-            break;
-        if (kernel->machine->mainMemory[addr + i] == '\0')
-            break;
-
-        *(buf + bufSize) = kernel->machine->mainMemory[addr + i];
-        ++bufSize;
-    }
-    buf[bufSize] = '\0';
-
-    return bufSize;
-}
-
-//----------------------------------------------------------------------
-// AdvancePC
-//  Advance program counter
-//----------------------------------------------------------------------
-
-void AdvancePC()
-{
-    kernel->machine->WriteRegister(PrevPCReg, kernel->machine->ReadRegister(PCReg));
-    kernel->machine->WriteRegister(PCReg, kernel->machine->ReadRegister(NextPCReg));
-    kernel->machine->WriteRegister(NextPCReg, kernel->machine->ReadRegister(PCReg) + sizeof(int));
-}
+int ReadStringFromUserAddrSpace(int addr, int limit, char *buf);
+void AdvancePC();
 
 //----------------------------------------------------------------------
 // ExceptionHandler
@@ -111,10 +75,13 @@ ExceptionHandler(ExceptionType which)
             return;
         case SC_Create:
             arg1 = kernel->machine->ReadRegister(4);
-            buf = new char[MAX_FILE_NAME_LENGTH];
-            bufSize = ReadStringFromMemory(arg1, MAX_FILE_NAME_LENGTH, buf);
+            buf = new char[MaxFileNameLength +1];
+            bufSize = ReadStringFromUserAddrSpace(arg1, MaxFileNameLength, buf);
 
-            if (kernel->fileSystem->Create(buf) == TRUE) {
+            if (bufSize <= 0) {
+                DEBUG(dbgAddr, "Illegal file name string\n");
+                kernel->machine->WriteRegister(2, -1);
+            } else if (kernel->fileSystem->Create(buf) == TRUE) {
                 DEBUG(dbgAddr, "Create file: " << buf << " succeed.\n");
                 kernel->machine->WriteRegister(2, 0);
             } else {
@@ -153,4 +120,53 @@ ExceptionHandler(ExceptionType which)
 	    break;
     }
     ASSERTNOTREACHED();
+}
+
+//----------------------------------------------------------------------
+// ReadStringFromUserAddrSpace
+//
+//  Returns length of string
+//
+// "addr" -- the virtual address to read from
+// "limit" -- max length of string can be read, no limitation with 0 value
+// "buf" -- the place to write the result
+//----------------------------------------------------------------------
+
+int ReadStringFromUserAddrSpace(int addr, int limit, char *buf)
+{
+    ASSERT(addr >= 0);
+    ASSERT(limit >= 0);
+
+    int ch;
+    int bufSize = 0;
+    for (int i = 0; addr > 0; ++i) {
+        if (limit > 0 && i >= limit)
+            break;
+
+        kernel->machine->ReadMem(addr + i, 1, &ch);
+        if (ch == 0)
+            break; 
+
+        buf[bufSize] = (char)ch;
+        ++bufSize;
+    }
+
+    buf[bufSize] = '\0';
+    
+    if (addr == 0)
+        bufSize = -1;
+
+    return bufSize;
+}
+
+//----------------------------------------------------------------------
+// AdvancePC
+//  Advance program counter
+//----------------------------------------------------------------------
+
+void AdvancePC()
+{
+    kernel->machine->WriteRegister(PrevPCReg, kernel->machine->ReadRegister(PCReg));
+    kernel->machine->WriteRegister(PCReg, kernel->machine->ReadRegister(NextPCReg));
+    kernel->machine->WriteRegister(NextPCReg, kernel->machine->ReadRegister(PCReg) + sizeof(int));
 }
