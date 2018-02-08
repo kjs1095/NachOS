@@ -55,6 +55,8 @@ Thread::Thread(char* threadName, bool isJoinable)
     readyToFinish = false;
 #ifdef USER_PROGRAM
     space = NULL;
+    for (int i = 0; i < MaxNumUserOpenFiles; ++i)
+        openFileTable[i] = new UserOpenFileEntry();
 #endif
 }
 
@@ -83,6 +85,14 @@ Thread::~Thread()
 
     if (stack != NULL)
 	DeallocBoundedArray((char *) stack, StackSize * sizeof(int));
+
+#ifdef USER_PROGRAM
+    for (int i = 0; i < MaxNumUserOpenFiles; ++i) {
+        if (openFileTable[i]->openFile != NULL)
+            delete openFileTable[i]->openFile;
+        delete openFileTable[i];
+    }
+#endif
 }
 
 //----------------------------------------------------------------------
@@ -464,6 +474,30 @@ Thread::RestoreUserState()
 {
     for (int i = 0; i < NumTotalRegs; i++)
 	kernel->machine->WriteRegister(i, userRegisters[i]);
+}
+
+//----------------------------------------------------------------------
+// Thread::AddOpenFileEntry
+//	Add OpenFile into user file table
+//
+// Return -1 if there is no room for handling another OpenFile
+// Return integer as file descriptor 
+//
+// "newOpenFile" is new OpenFile that tries to add into file table
+//----------------------------------------------------------------------
+
+int
+Thread::AddOpenFileEntry(OpenFile *newOpenfile)
+{
+    for (int i = 0; i < MaxNumUserOpenFiles; ++i) {
+        if (openFileTable[i]->inUse == FALSE) {
+            openFileTable[i]->openFile = newOpenfile;
+            openFileTable[i]->inUse = TRUE;
+            return i;
+        }
+    }
+
+    return -1;
 }
 
 #endif

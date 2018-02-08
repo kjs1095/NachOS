@@ -59,6 +59,8 @@ ExceptionHandler(ExceptionType which)
     int arg1;
     char* buf;
     int bufSize;
+    OpenFile *openFilePtr;
+    OpenFileId userFd, kernelFd;
 
     switch (which) {
 	case SyscallException:
@@ -69,7 +71,9 @@ ExceptionHandler(ExceptionType which)
 		    break;
         case SC_Exit:
             arg1 = kernel->machine->ReadRegister(4);
-            DEBUG(dbgAddr, "Exit wit return value: " << arg1 << ", initiated by user program.\n");
+            DEBUG(dbgAddr, "Exit wit return value: " << arg1 
+                            << ", initiated by user program.\n");
+
             kernel->currentThread->Finish();
 
             return;
@@ -79,18 +83,62 @@ ExceptionHandler(ExceptionType which)
             bufSize = ReadStringFromUserAddrSpace(arg1, MaxFileNameLength, buf);
 
             if (bufSize <= 0) {
-                DEBUG(dbgAddr, "Illegal file name string\n");
+                DEBUG(dbgAddr, "Illegal file name string at address: " 
+                                << arg1 << "\n");
+
                 kernel->machine->WriteRegister(2, -1);
             } else if (kernel->fileSystem->Create(buf) == TRUE) {
                 DEBUG(dbgAddr, "Create file: " << buf << " succeed.\n");
+                
                 kernel->machine->WriteRegister(2, 0);
             } else {
                 DEBUG(dbgAddr, "Create file: " << buf << " failed.\n");
+                
                 kernel->machine->WriteRegister(2, -1);
             }
 
             delete[] buf;
 
+            // Increment the pc before returning.
+            AdvancePC();
+            return;
+        case SC_Open:
+            arg1 = kernel->machine->ReadRegister(4);
+            buf = new char[MaxFileNameLength +1];
+            bufSize = ReadStringFromUserAddrSpace(arg1, MaxFileNameLength, buf);           
+
+            if (bufSize <= 0) {
+                DEBUG(dbgAddr, "Illegal file name string at address: " 
+                            << arg1 << "\n");
+                
+                kernel->machine->WriteRegister(2, -1);
+            } else {    // length of file name stirng > 0
+                openFilePtr = kernel->fileSystem->Open(buf);
+                
+                if (openFilePtr == NULL) {
+                    DEBUG(dbgAddr, "Fail to open file: " << buf << "\n");
+
+                    kernel->machine->WriteRegister(2, -1);
+                } else {    // open file accepted by FileSystem
+                    userFd = kernel->currentThread->AddOpenFileEntry(openFilePtr);
+
+                    if (userFd == -1) {
+                        DEBUG(dbgAddr, "No room for handling more file descriptor of file: " 
+                                << buf << "\n");
+
+                        delete openFilePtr;
+                        
+                        kernel->machine->WriteRegister(2, -1);
+                    } else {    // open file accepted by Thread
+                        DEBUG(dbgAddr, "Open file: " << buf << 
+                                    " with fd : " << userFd << "\n");
+
+                        kernel->machine->WriteRegister(2, userFd);
+                    }
+                }
+            }
+            delete[] buf;
+ 
             // Increment the pc before returning.
             AdvancePC();
             return;

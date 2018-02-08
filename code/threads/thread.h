@@ -67,6 +67,22 @@ enum ThreadStatus { JUST_CREATED, RUNNING, READY, BLOCKED };
 class Lock;
 class Condition;
 
+#ifdef USER_PROGRAM
+
+#define MaxNumUserOpenFiles 4
+class UserOpenFileEntry {
+  public:
+    UserOpenFileEntry() { 
+        inUse = FALSE;
+        openFile = NULL;
+    }
+    ~UserOpenFileEntry() {}
+
+    OpenFile* openFile;
+    bool inUse;
+};
+#endif
+
 // The following class defines a "thread control block" -- which
 // represents a single thread of execution.
 //
@@ -139,10 +155,13 @@ class Thread {
 // while executing kernel code.
 
     int userRegisters[NumTotalRegs];	// user-level CPU register state
-
+    UserOpenFileEntry *openFileTable[MaxNumUserOpenFiles];   
+                                        // user file descriptor table
   public:
     void SaveUserState();		// save user-level register state
     void RestoreUserState();		// restore user-level register state
+
+    int AddOpenFileEntry(OpenFile *newOpenFile);
 
     AddrSpace *space;			// User code this thread is running.
 #endif
