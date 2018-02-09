@@ -61,6 +61,7 @@ ExceptionHandler(ExceptionType which)
     int bufSize;
     OpenFile *openFilePtr;
     OpenFileId userFd;
+    int numBytesRW;
 
     switch (which) {
 	case SyscallException:
@@ -142,6 +143,43 @@ ExceptionHandler(ExceptionType which)
             // Increment the pc before returning.
             AdvancePC();
             return;
+        case SC_Write:
+            arg1 = kernel->machine->ReadRegister(4);
+            bufSize = kernel->machine->ReadRegister(5);
+            userFd = kernel->machine->ReadRegister(6);
+
+            openFilePtr = kernel->currentThread->GetOpenFileEntry(userFd);
+
+            if (openFilePtr == NULL) {
+                DEBUG(dbgAddr, "Illegal file descriptor: " << userFd <<"\n");
+                
+                kernel->machine->WriteRegister(2, -1);
+            } else if (bufSize < 0) {
+                 DEBUG(dbgAddr, "Illegal string length: " << bufSize << "\n");
+                
+                 kernel->machine->WriteRegister(2, -1);
+            } else { 
+                buf = new char[bufSize +1];
+                bufSize = ReadStringFromUserAddrSpace(arg1, bufSize, buf);
+                
+                if (bufSize <= 0) {
+                    DEBUG(dbgAddr, "Illegal string at address: " 
+                            << arg1 << "\n");
+                
+                    kernel->machine->WriteRegister(2, -1);
+                } else {
+                    numBytesRW = openFilePtr->Write(buf, bufSize);
+                    DEBUG(dbgAddr, "Written " << numBytesRW << " bytes."); 
+
+                    kernel->machine->WriteRegister(2, numBytesRW);
+                }
+            
+                delete[] buf; 
+            }
+
+            // Increment the pc before returning.
+            AdvancePC();
+            return;
         case SC_Close:
             arg1 = kernel->machine->ReadRegister(4);
             if (kernel->currentThread->RemoveOpenFileEntry(arg1) == TRUE) {
@@ -194,11 +232,10 @@ ExceptionHandler(ExceptionType which)
 int ReadStringFromUserAddrSpace(int addr, int limit, char *buf)
 {
     ASSERT(addr >= 0);
-    ASSERT(limit >= 0);
 
     int ch;
     int bufSize = 0;
-    for (int i = 0; addr > 0; ++i) {
+    for (int i = 0; addr > 0 && limit > 0; ++i) {
         if (limit > 0 && i >= limit)
             break;
 
@@ -212,7 +249,7 @@ int ReadStringFromUserAddrSpace(int addr, int limit, char *buf)
 
     buf[bufSize] = '\0';
     
-    if (addr == 0)
+    if (addr == 0 || limit <= 0)
         bufSize = -1;
 
     return bufSize;

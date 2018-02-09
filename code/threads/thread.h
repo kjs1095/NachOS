@@ -163,6 +163,7 @@ class Thread {
 
     int AddOpenFileEntry(OpenFile *newOpenFile);
     bool RemoveOpenFileEntry(int fd);
+    OpenFile* GetOpenFileEntry(int fd);
 
     AddrSpace *space;			// User code this thread is running.
 #endif

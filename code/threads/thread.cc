@@ -526,6 +526,28 @@ Thread::RemoveOpenFileEntry(int fd)
     }   
 }
 
+//----------------------------------------------------------------------
+// Thread::GetOpenFileEntry
+//  Retrive OpenFile from user file table by file descriptor
+//
+// Return pointer of target OpenFile, NULL for not found
+//
+// "fd" is the file descriptor of open file would retrive from file table
+//----------------------------------------------------------------------
+
+OpenFile*
+Thread::GetOpenFileEntry(int fd) 
+{
+    if (fd < 0 || fd >= MaxNumUserOpenFiles) {
+        return NULL;
+    } else if (openFileTable[fd]->inUse == FALSE) {
+        return NULL;
+    } else if (openFileTable[fd]->openFile == NULL) {
+        return NULL;
+    } else {    // fd is legal value and entry is in use and exist 
+        return openFileTable[fd]->openFile;
+    }   
+}
 #endif
 
 //----------------------------------------------------------------------
