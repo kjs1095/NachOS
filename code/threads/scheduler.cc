@@ -62,6 +62,7 @@ Scheduler::Scheduler()
     readyList = new List<Thread *>; 
     sleepList = new SortedList<PendingThread* >(PendingCompare);
     toBeDestroyed = NULL;
+    isPreemptive = FALSE;
 } 
 
 //----------------------------------------------------------------------

@@ -53,12 +53,16 @@ class Scheduler {
                     // if any when interrupt occured
     bool IsSleepListEmpty() { return sleepList->IsEmpty(); }
 
+    bool IsPreemptive() { return isPreemptive; }
+                    // return true if current scheduler is preemptive
+
   private:
     List<Thread *> *readyList;  // queue of threads that are ready to run,
 				// but not running
     SortedList<PendingThread *> *sleepList;
     Thread *toBeDestroyed;	// finishing thread to be destroyed
     				// by the next thread that runs
+    bool isPreemptive;
 };
 
 #endif // SCHEDULER_H

@@ -68,8 +68,11 @@ Alarm::CallBack()
         if (!interrupt->AnyFutureInterrupts()) {
 	    timer->Disable();	// turn off the timer
 	}
-    } else {			// there's someone to preempt
-	kernel->scheduler->WakeUpSleepingThread();
-    interrupt->YieldOnReturn();
+    } else {		
+        kernel->scheduler->WakeUpSleepingThread();
+        // there's someone to preempt
+        if (kernel->scheduler->IsPreemptive() == TRUE) {
+            interrupt->YieldOnReturn();
+        }
     }
 }
