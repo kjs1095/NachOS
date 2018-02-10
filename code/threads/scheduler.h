@@ -13,6 +13,13 @@
 #include "list.h"
 #include "thread.h"
 
+enum SchedulerType {
+    RR, // Round-Robin
+    FCFS, // First-Come-First-Serve
+    Priority,
+    SJF // Shortest Job First
+};
+
 // The following class defines a thread that is waked up in
 // the future.  The internal data structures are left public 
 // to make it simpler to manipulate.
@@ -32,7 +39,8 @@ class PendingThread {
 
 class Scheduler {
   public:
-    Scheduler();		// Initialize list of ready threads 
+    Scheduler(SchedulerType initSchedulerType=RR, 
+                bool isPreemptive=TRUE);		// Initialize list of ready threads 
     ~Scheduler();		// De-allocate ready list
 
     void ReadyToRun(Thread* thread);	
@@ -63,6 +71,7 @@ class Scheduler {
     Thread *toBeDestroyed;	// finishing thread to be destroyed
     				// by the next thread that runs
     bool isPreemptive;
+    SchedulerType schedulerType;
 };
 
 #endif // SCHEDULER_H

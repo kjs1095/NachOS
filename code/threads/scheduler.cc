@@ -57,8 +57,13 @@ PendingCompare (PendingThread *x, PendingThread *y)
 //	Initially, no ready threads.
 //----------------------------------------------------------------------
 
-Scheduler::Scheduler()
+Scheduler::Scheduler(SchedulerType initSchedulerType, bool isPreemptive)
 { 
+    DEBUG(dbgThread, "Scheduler type: " << schedulerType);
+    schedulerType = initSchedulerType;
+    this->isPreemptive = isPreemptive;
+    if (isPreemptive == TRUE && schedulerType == FCFS)
+        ASSERTNOTREACHED();
     readyList = new List<Thread *>; 
     sleepList = new SortedList<PendingThread* >(PendingCompare);
     toBeDestroyed = NULL;

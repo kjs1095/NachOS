@@ -24,16 +24,34 @@
 
 ThreadedKernel::ThreadedKernel(int argc, char **argv)
 {
-    randomSlice = FALSE; 
+    randomSlice = FALSE;
+    schedulerType = RR; 
+    preemptive = TRUE;
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-rs") == 0) {
- 	    ASSERT(i + 1 < argc);
-	    RandomInit(atoi(argv[i + 1]));// initialize pseudo-random
-					// number generator
-	    randomSlice = TRUE;
-	    i++;
+ 	        ASSERT(i + 1 < argc);
+	        RandomInit(atoi(argv[i + 1]));// initialize pseudo-random
+			    		// number generator
+	        randomSlice = TRUE;
+	        i++;
+        } else if (strcmp(argv[i], "-s") == 0) {
+            ASSERT(i +1 < argc);
+
+            if (strcmp(argv[i +1], "fcfs") == 0) {
+                schedulerType = FCFS; 
+                preemptive = FALSE;
+            } else if (strcmp(argv[i +1], "rr") == 0) {
+                schedulerType = RR;
+            } else {
+                ASSERTNOTREACHED();
+            }
+            i++;
         } else if (strcmp(argv[i], "-u") == 0) {
-            cout << "Partial usage: nachos [-rs randomSeed]\n";
+            cout << "Partial usage: nachos [-rs randomSeed] [-s SchedulerType]\n";
+            
+            cout << "SchedulerType could be \n";
+            cout << "   1. \"fcfs\" for First-Come-First-Serve\n";
+            cout << "   2. \"rr\" for Round-Robin (default)\n";
 	}
     }
 }
@@ -50,7 +68,8 @@ ThreadedKernel::Initialize()
 {
     stats = new Statistics();		// collect statistics
     interrupt = new Interrupt;		// start up interrupt handling
-    scheduler = new Scheduler();	// initialize the ready queue
+    scheduler = new Scheduler(schedulerType, preemptive);
+                                    // initialize the ready queue
     alarm = new Alarm(randomSlice);	// start up time slicing
 
     // We didn't explicitly allocate the current thread we are running in.
