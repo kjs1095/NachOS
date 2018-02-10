@@ -52,6 +52,55 @@ PendingCompare (PendingThread *x, PendingThread *y)
 }
 
 //----------------------------------------------------------------------
+// ArrivalTimeComparator
+//  Compare to threads based on time arrived in ready list
+//----------------------------------------------------------------------
+
+static int
+ArrivalTimeComparator(Thread *a, Thread *b)
+{
+    if (a->getArrivalTimeOfReadyList() > b->getArrivalTimeOfReadyList()) {
+        return 1;
+    } else if (a->getArrivalTimeOfReadyList() < b->getArrivalTimeOfReadyList()) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+//----------------------------------------------------------------------
+// PriorityComparator
+//  Compare to threads based on priority
+//----------------------------------------------------------------------
+
+static int
+PriorityComparator(Thread *a, Thread *b)
+{
+    if (a->getPriority() > b->getPriority()) { return -1; }
+    else if (a->getPriority() < b->getPriority()) { return 1; }
+    else { return ArrivalTimeComparator(a, b); }
+}
+
+static int 
+ThreadComparator(Thread *a, Thread *b)
+{   
+    SchedulerType st = kernel->scheduler->getSchedulerType();
+
+    switch (st) {
+        case Priority:
+            return PriorityComparator(a, b);
+        case RR:    // Round-Robin
+            return ArrivalTimeComparator(a, b);
+        case FCFS:  // First-Come-First-Serve
+            return ArrivalTimeComparator(a, b);
+        default:
+            cerr << "Undefined scheduler type\n";
+            break;
+    }   
+    ASSERTNOTREACHED();
+}
+
+//----------------------------------------------------------------------
 // Scheduler::Scheduler
 // 	Initialize the list of ready but not running threads.
 //	Initially, no ready threads.
@@ -64,7 +113,7 @@ Scheduler::Scheduler(SchedulerType initSchedulerType, bool isPreemptive)
     this->isPreemptive = isPreemptive;
     if (isPreemptive == TRUE && schedulerType == FCFS)
         ASSERTNOTREACHED();
-    readyList = new List<Thread *>; 
+    readyList = new SortedList<Thread *>(ThreadComparator); 
     sleepList = new SortedList<PendingThread* >(PendingCompare);
     toBeDestroyed = NULL;
     isPreemptive = FALSE;
@@ -85,6 +134,17 @@ Scheduler::~Scheduler()
 } 
 
 //----------------------------------------------------------------------
+// Scheduler::getSchedulerType
+//  Return the scheduler type
+//----------------------------------------------------------------------
+
+SchedulerType
+Scheduler::getSchedulerType()
+{
+    return schedulerType;
+}
+
+//----------------------------------------------------------------------
 // Scheduler::ReadyToRun
 // 	Mark a thread as ready, but not running.
 //	Put it on the ready list, for later scheduling onto the CPU.
@@ -96,10 +156,12 @@ void
 Scheduler::ReadyToRun (Thread *thread)
 {
     ASSERT(kernel->interrupt->getLevel() == IntOff);
-    DEBUG(dbgThread, "Putting thread on ready list: " << thread->getName());
+    DEBUG(dbgThread, "Putting thread on ready list: " << thread->getName()
+                    << " with arrival time: " << kernel->stats->totalTicks);
 
     thread->setStatus(READY);
-    readyList->Append(thread);
+    thread->setArrivalTimeOfReadyList(kernel->stats->totalTicks);
+    readyList->Insert(thread);
 }
 
 //----------------------------------------------------------------------

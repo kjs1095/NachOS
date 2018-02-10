@@ -39,8 +39,8 @@ class PendingThread {
 
 class Scheduler {
   public:
-    Scheduler(SchedulerType initSchedulerType=RR, 
-                bool isPreemptive=TRUE);		// Initialize list of ready threads 
+    Scheduler(SchedulerType initSchedulerType, bool isPreemptive);		
+                // Initialize list of ready threads 
     ~Scheduler();		// De-allocate ready list
 
     void ReadyToRun(Thread* thread);	
@@ -63,9 +63,10 @@ class Scheduler {
 
     bool IsPreemptive() { return isPreemptive; }
                     // return true if current scheduler is preemptive
+    SchedulerType getSchedulerType();
 
   private:
-    List<Thread *> *readyList;  // queue of threads that are ready to run,
+    SortedList<Thread *> *readyList;  // queue of threads that are ready to run,
 				// but not running
     SortedList<PendingThread *> *sleepList;
     Thread *toBeDestroyed;	// finishing thread to be destroyed

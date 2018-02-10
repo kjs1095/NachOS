@@ -33,7 +33,7 @@ const int STACK_FENCEPOST = 0xdedbeef;
 //	"threadName" is an arbitrary string, useful for debugging.
 //----------------------------------------------------------------------
 
-Thread::Thread(char* threadName, bool isJoinable)
+Thread::Thread(char* threadName, int priority, bool isJoinable)
 {
     name = threadName;
     stackTop = NULL;
@@ -53,6 +53,8 @@ Thread::Thread(char* threadName, bool isJoinable)
     finishCalled = false;
     forkCalled = false;
     readyToFinish = false;
+
+    (void) setPriority(priority);    
 #ifdef USER_PROGRAM
     space = NULL;
     for (int i = 0; i < MaxNumUserOpenFiles; ++i)
@@ -93,6 +95,66 @@ Thread::~Thread()
         delete openFileTable[i];
     }
 #endif
+}
+
+//----------------------------------------------------------------------
+// Thread::setPriority
+//  Set new priority value and return old value. 
+//  Assume this method just is used internally and called by constructor
+//
+// Return: old priority value 
+// "newPriority" is the new priority value
+//----------------------------------------------------------------------
+
+int Thread::setPriority(int newPriority)
+{
+    // should be atomic
+ 
+    if (newPriority < 0)        newPriority = 0;
+    else if (newPriority > 7)   newPriority = 7;
+ 
+    int oldPriority = priority;
+    priority = newPriority;
+    
+    return oldPriority;
+}
+
+//----------------------------------------------------------------------
+// Thread::getPriority
+//  Return: priority value
+//----------------------------------------------------------------------
+
+int Thread::getPriority()
+{
+    ASSERT(kernel->interrupt->getLevel() == IntOff);
+
+    return priority;
+}
+
+//----------------------------------------------------------------------
+// Thread::setArrivalTimeOfReadyList
+//  Set new arrival time to ready list
+//
+// "newArrival" is the new arrival time to ready list
+//----------------------------------------------------------------------
+
+void Thread::setArrivalTimeOfReadyList(int newArrivalTime)
+{ 
+    ASSERT(kernel->interrupt->getLevel() == IntOff);  
+
+    arrivalTime = newArrivalTime;
+}
+
+//----------------------------------------------------------------------
+// Thread::getArrivalTimeOfReadyList
+//  Return: arrival time to ready list
+//----------------------------------------------------------------------
+
+int Thread::getArrivalTimeOfReadyList()
+{
+    ASSERT(kernel->interrupt->getLevel() == IntOff);
+
+    return arrivalTime;
 }
 
 //----------------------------------------------------------------------

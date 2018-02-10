@@ -102,7 +102,7 @@ class Thread {
     void *machineState[MachineStateSize];  // all registers except for stackTop
 
   public:
-    Thread(char* debugName, bool isJoinable = FALSE);
+    Thread(char* debugName, int priority = 1, bool isJoinable = FALSE);
                     // initialize a Thread 
     ~Thread(); 				// deallocate a Thread
 					// NOTE -- thread being deleted
@@ -127,6 +127,10 @@ class Thread {
     void Print() { cout << name; }
     void SelfTest();		// test whether thread impl is working
 
+    int getPriority(); 
+    void setArrivalTimeOfReadyList(int newArrivalTime);
+    int getArrivalTimeOfReadyList();
+ 
   private:
     // some of the private data for this class is listed above
     
@@ -148,6 +152,10 @@ class Thread {
     bool joinCalled;
     bool forkCalled;
     bool readyToFinish;
+
+    int setPriority(int newPriority);  // return old priority value 
+    int priority;
+    int arrivalTime;
 
 #ifdef USER_PROGRAM
 // A thread running a user program actually has *two* sets of CPU registers -- 
