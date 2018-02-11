@@ -8,6 +8,7 @@
 
 #include "copyright.h"
 #include "synchconsole.h"
+#include "framemanager.h"
 #include "userkernel.h"
 
 //----------------------------------------------------------------------
@@ -46,8 +47,11 @@ UserProgKernel::Initialize()
 
     machine = new Machine(debugUserProg);
     fileSystem = new FileSystem();
+
     synchConsoleInput = NULL;
     synchConsoleOutput = new SynchConsoleOutput(NULL);
+
+    frameManager = new FrameManager(NumPhysPages);
 }
 
 //----------------------------------------------------------------------
@@ -58,6 +62,7 @@ UserProgKernel::Initialize()
 
 UserProgKernel::~UserProgKernel()
 {
+    delete frameManager;
     delete synchConsoleInput;
     delete synchConsoleOutput;
     delete fileSystem;

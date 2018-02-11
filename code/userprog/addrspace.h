@@ -41,6 +41,7 @@ class AddrSpace {
     void InitRegisters();		// Initialize user-level CPU registers,
 					// before jumping to user code
 
+    void LoadSegment(OpenFile *executable, int base, int size, int fileAddr);
 };
 
 #endif // ADDRSPACE_H

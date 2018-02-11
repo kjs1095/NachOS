@@ -108,7 +108,6 @@ ThreadComparator(Thread *a, Thread *b)
 
 Scheduler::Scheduler(SchedulerType initSchedulerType, bool isPreemptive)
 { 
-    DEBUG(dbgThread, "Scheduler type: " << schedulerType);
     schedulerType = initSchedulerType;
     this->isPreemptive = isPreemptive;
     if (isPreemptive == TRUE && schedulerType == FCFS)

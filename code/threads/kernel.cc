@@ -34,7 +34,7 @@ ThreadedKernel::ThreadedKernel(int argc, char **argv)
 			    		// number generator
 	        randomSlice = TRUE;
 	        i++;
-        } else if (strcmp(argv[i], "-s") == 0) {
+        } else if (strcmp(argv[i], "-st") == 0) {
             ASSERT(i +1 < argc);
 
             if (strcmp(argv[i +1], "fcfs") == 0) {
@@ -49,7 +49,7 @@ ThreadedKernel::ThreadedKernel(int argc, char **argv)
             }
             i++;
         } else if (strcmp(argv[i], "-u") == 0) {
-            cout << "Partial usage: nachos [-rs randomSeed] [-s SchedulerType]\n";
+            cout << "Partial usage: nachos [-rs randomSeed] [-st SchedulerType]\n";
             
             cout << "SchedulerType could be \n";
             cout << "   1. \"fcfs\" for First-Come-First-Serve\n";

@@ -89,6 +89,7 @@ USERPROG_H = ../userprog/addrspace.h\
 	../userprog/userkernel.h\
 	../userprog/syscall.h\
 	../userprog/synchconsole.h\
+    ../userprog/framemanager.h\
         ../filesys/filesys.h\
         ../filesys/openfile.h\
         ../machine/console.h\
@@ -99,13 +100,14 @@ USERPROG_H = ../userprog/addrspace.h\
 USERPROG_C = ../userprog/addrspace.cc\
         ../userprog/exception.cc\
 	../userprog/synchconsole.cc\
+    ../userprog/framemanager.cc\
 	../userprog/userkernel.cc\
         ../machine/console.cc\
         ../machine/machine.cc\
         ../machine/mipssim.cc\
         ../machine/translate.cc
 
-USERPROG_O = addrspace.o exception.o synchconsole.o console.o machine.o \
+USERPROG_O = addrspace.o exception.o synchconsole.o console.o framemanager.o machine.o \
         mipssim.o translate.o userkernel.o
 
 NETWORK_H = ../network/netkernel.h ../network/post.h ../machine/network.h

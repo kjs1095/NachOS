@@ -94,6 +94,8 @@ Thread::~Thread()
             delete openFileTable[i]->openFile;
         delete openFileTable[i];
     }
+
+    delete space;
 #endif
 }
 
