@@ -26,6 +26,7 @@
 #include "syscall.h"
 #include "synchconsole.h"
 
+int WriteCharsToUserAddrSpace(int addr, char *buf, int limit);
 int ReadStringFromUserAddrSpace(int addr, int limit, char *buf);
 void AdvancePC();
 
@@ -143,6 +144,44 @@ ExceptionHandler(ExceptionType which)
             // Increment the pc before returning.
             AdvancePC();
             return;
+        case SC_Read:
+            arg1 = kernel->machine->ReadRegister(4);
+            bufSize = kernel->machine->ReadRegister(5);
+            userFd = kernel->machine->ReadRegister(6);
+
+            openFilePtr = kernel->currentThread->GetOpenFileEntry(userFd);
+
+            if (openFilePtr == NULL) {
+                DEBUG(dbgAddr, "Illegal file descriptor: " << userFd <<"\n");
+
+                kernel->machine->WriteRegister(2, -1);
+            } else if (bufSize <= 0) {
+                 DEBUG(dbgAddr, "Illegal string length: " << bufSize << "\n");
+
+                 kernel->machine->WriteRegister(2, -1);
+            } else { 
+                buf = new char[bufSize +1];
+                bufSize = openFilePtr->Read(buf, bufSize);
+
+                if (bufSize <= 0) {
+                    DEBUG(dbgAddr, "Read failed with file descriptor: " 
+                            << userFd << "\n");
+                    cout << "read failed : " << userFd << "\n";
+
+                    kernel->machine->WriteRegister(2, -1);
+                } else {
+                    numBytesRW = WriteCharsToUserAddrSpace(arg1, buf, bufSize);
+                    DEBUG(dbgAddr, "Read " << numBytesRW << " bytes."); 
+
+                    kernel->machine->WriteRegister(2, numBytesRW);
+                }
+
+                delete[] buf;
+            }
+
+            // Increment the pc before returning.
+            AdvancePC();
+            return;
         case SC_Write:
             arg1 = kernel->machine->ReadRegister(4);
             bufSize = kernel->machine->ReadRegister(5);
@@ -217,6 +256,33 @@ ExceptionHandler(ExceptionType which)
 	    break;
     }
     ASSERTNOTREACHED();
+}
+
+//----------------------------------------------------------------------
+// WriteCharsToUserAddrSpace
+//
+//  Returns length of string
+//
+// "addr" -- the virtual address to write to
+// "limit" -- max length of string can be written
+// "buf" -- source of data
+//----------------------------------------------------------------------
+
+int WriteCharsToUserAddrSpace(int addr, char *buf, int limit)
+{
+    ASSERT(addr >= 0);
+    if (limit <= 0)
+        return -1;
+
+    int ch;
+    int bufSize;
+    for (bufSize = 0; bufSize < limit; ++bufSize) {
+        ch = (int) buf[bufSize];
+        if (kernel->machine->WriteMem(addr + bufSize, 1, ch) == FALSE)
+            break;
+    }
+
+    return bufSize;
 }
 
 //----------------------------------------------------------------------
