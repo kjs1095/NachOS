@@ -192,6 +192,7 @@ void Lock::Acquire()
     IntStatus oldLevel = interrupt->SetLevel(IntOff);
 
     while (locked == TRUE) {
+        DonatePriorityToLockHolder(currentThread);
         waitQueue->Append(currentThread);
         currentThread->Sleep(FALSE);        
     }
@@ -222,7 +223,8 @@ void Lock::Release()
     Interrupt *interrupt = kernel->interrupt;
     IntStatus oldLevel = interrupt->SetLevel(IntOff); // disable interrupt
 
-    if (!waitQueue->IsEmpty())
+    bool didLockHolderHaveBeenDonated = CleanDonatedPriority();
+    while (!waitQueue->IsEmpty())
         kernel->scheduler->ReadyToRun(waitQueue->RemoveFront());
     
     lockHolder = NULL;
@@ -230,6 +232,37 @@ void Lock::Release()
 
     // re-enable interrupt
     (void*) interrupt->SetLevel(oldLevel);
+
+    if (kernel->scheduler->IsPreemptive() && didLockHolderHaveBeenDonated == TRUE)
+        kernel->currentThread->Yield();
+}
+
+//----------------------------------------------------------------------
+// Lock::DonatePriorityToLockHolder
+//  Donate effective priority to lock holder by current thread.
+//
+// "doner" : doner thread of effective priority
+//---------------------------------------------------------------------
+
+void Lock::DonatePriorityToLockHolder(Thread* doner)
+{
+    kernel->scheduler->DonatePriority(doner, lockHolder);
+}
+
+//----------------------------------------------------------------------
+// Lock::CleanDonatedPriorty()
+//  Reset donated priority of lock holder. Used interally by Release()
+//
+// Return TRUE, if lockHolder had been donated. FALSE, otherwise. 
+//---------------------------------------------------------------------
+
+bool Lock::CleanDonatedPriority()
+{
+    DEBUG(dbgSynch, "Lock: " << this->getName() << ", "
+                << " reset donated priority of lock holder: " 
+                << lockHolder->getName());
+
+    return lockHolder->resetEffectivePriority();
 }
 
 //----------------------------------------------------------------------

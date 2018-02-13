@@ -52,23 +52,6 @@ PendingCompare (PendingThread *x, PendingThread *y)
 }
 
 //----------------------------------------------------------------------
-// ArrivalTimeComparator
-//  Compare to threads based on time arrived in ready list
-//----------------------------------------------------------------------
-
-static int
-ArrivalTimeComparator(Thread *a, Thread *b)
-{
-    if (a->getArrivalTimeOfReadyList() > b->getArrivalTimeOfReadyList()) {
-        return 1;
-    } else if (a->getArrivalTimeOfReadyList() < b->getArrivalTimeOfReadyList()) {
-        return -1;
-    } else {
-        return 0;
-    }
-}
-
-//----------------------------------------------------------------------
 // PriorityComparator
 //  Compare to threads based on priority
 //----------------------------------------------------------------------
@@ -78,7 +61,20 @@ PriorityComparator(Thread *a, Thread *b)
 {
     if (a->getPriority() > b->getPriority()) { return -1; }
     else if (a->getPriority() < b->getPriority()) { return 1; }
-    else { return ArrivalTimeComparator(a, b); }
+    else { return 0; }
+}
+
+//----------------------------------------------------------------------
+// EffectivePriorityComparator
+//  Compare to threads based on effective priority
+//----------------------------------------------------------------------
+
+static int
+EffectivePriorityComparator(Thread *a, Thread *b)
+{
+    if (a->getEffectivePriority() > b->getEffectivePriority()) { return -1; }
+    else if (a->getEffectivePriority() < b->getEffectivePriority()) { return 1; }
+    else { return 0; }
 }
 
 static int 
@@ -88,11 +84,14 @@ ThreadComparator(Thread *a, Thread *b)
 
     switch (st) {
         case Priority:
-            return PriorityComparator(a, b);
+            if (kernel->scheduler->IsPreemptive() == TRUE)
+                return EffectivePriorityComparator(a, b);
+            else
+                return PriorityComparator(a, b);
         case RR:    // Round-Robin
-            return ArrivalTimeComparator(a, b);
+            return 0;
         case FCFS:  // First-Come-First-Serve
-            return ArrivalTimeComparator(a, b);
+            return 0;
         default:
             cerr << "Undefined scheduler type\n";
             break;
@@ -159,7 +158,6 @@ Scheduler::ReadyToRun (Thread *thread)
                     << " with arrival time: " << kernel->stats->totalTicks);
 
     thread->setStatus(READY);
-    thread->setArrivalTimeOfReadyList(kernel->stats->totalTicks);
     readyList->Insert(thread);
 }
 
@@ -176,10 +174,33 @@ Scheduler::FindNextToRun ()
 {
     ASSERT(kernel->interrupt->getLevel() == IntOff);
 
-    if (readyList->IsEmpty()) {
-	return NULL;
-    } else {
-    	return readyList->RemoveFront();
+    if (isPreemptive == FALSE) {
+        if (readyList->IsEmpty()) {
+	        return NULL;
+        } else {
+    	    return readyList->RemoveFront();
+        }
+    } else {    // Preemptive
+        if (kernel->currentThread->getStatus() == BLOCKED) {
+            if (readyList->IsEmpty()) {
+                return NULL;
+            } else {
+                return readyList->RemoveFront();
+            }
+        } else {    // CurrentThread is not blocked
+            if (readyList->IsEmpty()) {
+                return kernel->currentThread;
+            } else {
+                int cmp = CompareThread(readyList->Front(), 
+                            kernel->currentThread);
+
+                if (cmp <= 0) {
+                    return readyList->RemoveFront();
+                } else {
+                    return kernel->currentThread;
+                }
+            }
+        }
     }
 }
 
@@ -314,6 +335,68 @@ Scheduler::WakeUpSleepingThread()
             break;
         }
     }   
+}
+
+//----------------------------------------------------------------------
+// Scheduler::CompareThread
+//  Compare two threads by ThreadComparator  
+//----------------------------------------------------------------------
+int Scheduler::CompareThread(Thread* thread1, Thread* thread2)
+{   
+    return ThreadComparator(thread1, thread2);
+}
+
+//----------------------------------------------------------------------
+// Scheduler::DonatePriority
+//  Check whether donee's effective priority would accept doner's or not.
+//
+// "doner" is the doner thread that tries to contribute effecitve priority 
+// "donee" is the donee thread that can accept new donation
+//----------------------------------------------------------------------
+void Scheduler::DonatePriority(Thread* doner, Thread* donee)
+{   
+    Thread* currentThread = kernel->currentThread;
+
+    DEBUG(dbgThread, "Thread: " <<  doner->getName() << " (" << 
+        doner->getEffectivePriority() << ") donates effective priority to " <<
+        "Thread: " << donee->getName() << " (" << donee->getEffectivePriority() 
+        << ")");
+    
+    ASSERT(kernel->interrupt->getLevel() == IntOff);
+    ASSERT(doner != donee);
+
+    if (CompareThread(doner, donee) < 0) {
+        (void*) donee->setEffectivePriority(doner->getEffectivePriority());
+    }
+}
+
+//----------------------------------------------------------------------
+// Scheduler::UpdateReadyList
+//  Make sure ready list is sorted if any thread get donated priority.
+//
+// "updatedThread" is the thread get doanted priority
+//----------------------------------------------------------------------
+bool Scheduler::UpdateReadyList(Thread* updatedThread)
+{   
+    ASSERT(kernel->interrupt->getLevel() == IntOff);
+
+    if (readyList->IsInList(updatedThread) == FALSE)
+        return FALSE;
+    
+    if (debug->IsEnabled(dbgThread)) {
+        DEBUG(dbgThread, "=== Before updating ===");
+        Print();
+    }
+ 
+    readyList->Remove(updatedThread);
+    readyList->Insert(updatedThread);
+
+    if (debug->IsEnabled(dbgThread)) {
+        DEBUG(dbgThread, "=== After updating ===");
+        Print();
+    }
+
+    return TRUE;
 }
  
 //----------------------------------------------------------------------

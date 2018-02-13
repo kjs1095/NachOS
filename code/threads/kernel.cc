@@ -44,6 +44,9 @@ ThreadedKernel::ThreadedKernel(int argc, char **argv)
             } else if (strcmp(argv[i +1], "pri") == 0) {
                 schedulerType = Priority;
                 preemptive = FALSE;
+            } else if (strcmp(argv[i +1], "ppri") == 0) {
+                schedulerType = Priority;
+                preemptive = TRUE;
             } else {
                 ASSERTNOTREACHED();
             }
@@ -55,6 +58,7 @@ ThreadedKernel::ThreadedKernel(int argc, char **argv)
             cout << "   1. \"fcfs\" for First-Come-First-Serve\n";
             cout << "   2. \"rr\" for Round-Robin (default)\n";
             cout << "   3. \"pri\" for Non-preemptive Priority\n";
+            cout << "   4. \"ppri\" for Preemptive Priority\n";
 	}
     }
 }

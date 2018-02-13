@@ -54,7 +54,12 @@ Thread::Thread(char* threadName, int priority, bool isJoinable)
     forkCalled = false;
     readyToFinish = false;
 
-    (void) setPriority(priority);    
+    (void) setPriority(priority);
+
+    donatedPriority = 0;
+    isDonated = FALSE;
+    desiredJoin = NULL;
+    desiredLock = NULL;
 #ifdef USER_PROGRAM
     space = NULL;
     for (int i = 0; i < MaxNumUserOpenFiles; ++i)
@@ -110,7 +115,7 @@ Thread::~Thread()
 
 int Thread::setPriority(int newPriority)
 {
-    // should be atomic
+    // TODO should be atomic in the future
  
     if (newPriority < 0)        newPriority = 0;
     else if (newPriority > 7)   newPriority = 7;
@@ -134,29 +139,114 @@ int Thread::getPriority()
 }
 
 //----------------------------------------------------------------------
-// Thread::setArrivalTimeOfReadyList
-//  Set new arrival time to ready list
+// Thread::setEffectivePriority
+//  Upate effective priority and update ready list.
 //
-// "newArrival" is the new arrival time to ready list
+//  Return old effective priority value
+//
+// "newDonatedPriority" is priority donated from other thread
 //----------------------------------------------------------------------
 
-void Thread::setArrivalTimeOfReadyList(int newArrivalTime)
-{ 
-    ASSERT(kernel->interrupt->getLevel() == IntOff);  
+int Thread::setEffectivePriority(int newDonatedPriority)
+{
+    ASSERT(kernel->interrupt->getLevel() == IntOff);
+    ASSERT(newDonatedPriority >= 0);
+    DEBUG(dbgThread, "Thread "<< name << " gets donate: " << newDonatedPriority);
 
-    arrivalTime = newArrivalTime;
+    int oldDonatedPriority = donatedPriority;
+
+    donatedPriority = newDonatedPriority;
+    isDonated = TRUE;
+    kernel->scheduler->UpdateReadyList(this);
+
+    NotifyDesiredLockNewDonation();
+    NotifyDesiredJoinNewDonation();
+
+    return oldDonatedPriority;
 }
 
 //----------------------------------------------------------------------
-// Thread::getArrivalTimeOfReadyList
-//  Return: arrival time to ready list
+// Thread::getEffectivePriority
+//  Return donated priority if set, otherwise return its own priority
 //----------------------------------------------------------------------
 
-int Thread::getArrivalTimeOfReadyList()
+int Thread::getEffectivePriority()
 {
     ASSERT(kernel->interrupt->getLevel() == IntOff);
 
-    return arrivalTime;
+    if (isDonated == FALSE)
+        return priority;
+    else
+        return donatedPriority;
+}
+
+//----------------------------------------------------------------------
+// Thread::resetEffectivePriority
+//  Reset isDonated to FALSE
+//
+// Return TRUE, if succeed. FALSE, otherwise
+//----------------------------------------------------------------------
+
+bool Thread::resetEffectivePriority()
+{
+    ASSERT(kernel->interrupt->getLevel() == IntOff);
+
+    bool oldValue = isDonated;
+    if (oldValue == TRUE) {
+        isDonated = FALSE;
+        kernel->scheduler->UpdateReadyList(this);
+    }
+
+    return oldValue;
+}
+
+//----------------------------------------------------------------------
+// Thread::setDesiredJoin
+//  Called by Join when caller thread (current thread) has to wait for 
+//  "joinThread" 
+//----------------------------------------------------------------------
+
+void Thread::setDesiredJoin(Thread* joinThread)
+{
+    ASSERT(kernel->interrupt->getLevel() == IntOff);
+   
+    this->desiredJoin = joinThread;
+}
+
+//----------------------------------------------------------------------
+// Thread::resetDesiredJoin
+//  Called by Join when joinable thread finish
+//----------------------------------------------------------------------
+
+void Thread::resetDesiredJoin()
+{
+    ASSERT(kernel->interrupt->getLevel() == IntOff);
+
+    desiredJoin = NULL;
+}
+
+//----------------------------------------------------------------------
+// Thread::setDesiredLock
+//  Called by Lock when this thread tries to acqure lock but failed
+//----------------------------------------------------------------------
+
+void Thread::setDesiredLock(Lock* desiredLock)
+{
+    ASSERT(kernel->interrupt->getLevel() == IntOff);
+
+    this->desiredLock = desiredLock;
+}
+
+//----------------------------------------------------------------------
+// Thread::resetDesiredLock
+//  Called by Lock when this thread acquire lock sucessfully
+//----------------------------------------------------------------------
+
+void Thread::resetDesiredLock()
+{
+    ASSERT(kernel->interrupt->getLevel() == IntOff);
+
+    desiredLock = NULL;
 }
 
 //----------------------------------------------------------------------
@@ -196,6 +286,9 @@ Thread::Fork(VoidFunctionPtr func, void *arg)
 
     forkCalled = TRUE;
     (void) interrupt->SetLevel(oldLevel);
+
+    if (kernel->scheduler->IsPreemptive())
+        kernel->currentThread->Yield();
 }    
 
 //----------------------------------------------------------------------
@@ -269,22 +362,30 @@ Thread::Finish ()
     
     DEBUG(dbgThread, "Finishing thread: " << name);
     
-    joinLock->Acquire();
-    finishCalled = TRUE;
-
-    while (!joinCalled && isJoinable) {
-        joinWait->Wait(joinLock);
-    }
-
-    finishWait->Signal(joinLock);
-
-    while (!readyToFinish && isJoinable) {
-        deleteWait->Wait(joinLock);
-    }
-
-    joinLock->Release();
-
     if (isJoinable) {
+        joinLock->Acquire();
+        finishCalled = TRUE;
+
+        while (!joinCalled) {
+            joinWait->Wait(joinLock);
+            (void) kernel->interrupt->SetLevel(IntOff);
+        }
+
+        finishWait->Signal(joinLock);
+
+        if (kernel->scheduler->IsPreemptive()) {
+            (void) setPriority(0);
+            (void) resetEffectivePriority(); // caller should leave Join() first, 
+                // or memory access error would be occured. 
+        }
+
+        while (!readyToFinish) {
+            deleteWait->Wait(joinLock);
+            (void) kernel->interrupt->SetLevel(IntOff);
+        }
+
+        joinLock->Release();
+
         DEBUG(dbgThread, "Wholly finishing thread after Join() called: " << name);
     }
 
@@ -322,7 +423,7 @@ Thread::Yield ()
     DEBUG(dbgThread, "Yielding thread: " << name);
     
     nextThread = kernel->scheduler->FindNextToRun();
-    if (nextThread != NULL) {
+    if (nextThread != NULL && nextThread != this) {
 	kernel->scheduler->ReadyToRun(this);
 	kernel->scheduler->Run(nextThread, FALSE);
     }
@@ -381,21 +482,58 @@ Thread::Join ()
     ASSERT(joinCalled == FALSE);
     ASSERT(forkCalled == TRUE);
 
+    IntStatus oldLevel = kernel->interrupt->SetLevel(IntOff);
     DEBUG(dbgThread , "Joining thread: " << name);
 
     joinLock->Acquire();
     joinCalled = TRUE;
-    
+
     while (!finishCalled) {
+        if (kernel->scheduler->IsPreemptive() == TRUE) {
+            IntStatus oldLevel = kernel->interrupt->SetLevel(IntOff);
+
+            kernel->currentThread->setDesiredJoin(this);
+            kernel->scheduler->DonatePriority(kernel->currentThread, this);
+
+            (void) kernel->interrupt->SetLevel(oldLevel);
+        }
+
         finishWait->Wait(joinLock);
     }
-    
+   
+    kernel->currentThread->resetDesiredJoin(); 
     joinWait->Signal(joinLock);
 
     readyToFinish = TRUE;
     deleteWait->Signal(joinLock);
     
     joinLock->Release(); 
+
+    (void) kernel->interrupt->SetLevel(oldLevel);
+}
+
+//----------------------------------------------------------------------
+// Thread::NotifyDesiredJoinNewDonation 
+//  Used internally by setEffectivePriority
+//----------------------------------------------------------------------
+
+void 
+Thread::NotifyDesiredJoinNewDonation()
+{
+    if (desiredJoin != NULL)
+        kernel->scheduler->DonatePriority(this, desiredJoin);
+}
+
+//----------------------------------------------------------------------
+// Thread::NotifyDesiredLockNewDonation
+//  Used internally by setEffectivePriority
+//----------------------------------------------------------------------
+
+void 
+Thread::NotifyDesiredLockNewDonation()
+{
+    if (desiredLock != NULL)
+        desiredLock->DonatePriorityToLockHolder(this);
 }
 
 //----------------------------------------------------------------------

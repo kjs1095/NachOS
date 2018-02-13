@@ -65,6 +65,13 @@ class Scheduler {
                     // return true if current scheduler is preemptive
     SchedulerType getSchedulerType();
 
+    int CompareThread(Thread* thread1, Thread* thread2);
+
+    void DonatePriority(Thread* doner, Thread* donee);
+
+    bool UpdateReadyList(Thread* updatedThread);    // Update ready list
+                // if any thread changes its effective priority
+
   private:
     SortedList<Thread *> *readyList;  // queue of threads that are ready to run,
 				// but not running

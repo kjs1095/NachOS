@@ -79,10 +79,17 @@ class Lock {
     		return lockHolder == kernel->currentThread; }
     				// return true if the current thread 
 				// holds this lock.
-    
+
     // Note: SelfTest routine provided by SynchList
-    
+
+    void DonatePriorityToLockHolder(Thread* doner);
+                    // Any thread which tries to acquire lock, 
+                    // will donate priority to lock holder.
   private:
+    bool CleanDonatedPriority();
+                    // Clean donated priority of lock holder. 
+                    // Used internally by Release()
+
     char *name;			// debugging assist
     Thread *lockHolder;		// thread currently holding lock
     List<Thread* > *waitQueue;  // list of waiting thread 

@@ -124,13 +124,21 @@ class Thread {
     void CheckOverflow();   	// Check if thread stack has overflowed
     void setStatus(ThreadStatus st) { status = st; }
     char* getName() { return (name); }
-    void Print() { cout << name; }
+    void Print() { cout << name << "\n"; }
     void SelfTest();		// test whether thread impl is working
 
     int getPriority(); 
-    void setArrivalTimeOfReadyList(int newArrivalTime);
-    int getArrivalTimeOfReadyList();
- 
+
+    int setEffectivePriority(int newDonatedPriority);  
+            // set new effective priority and return old value            
+    int getEffectivePriority();
+    bool resetEffectivePriority();
+    ThreadStatus getStatus() { return (status); }
+    void setDesiredJoin(Thread* joinThread);
+    void resetDesiredJoin();
+    void setDesiredLock(Lock* desiredLock);
+    void resetDesiredLock();
+
   private:
     // some of the private data for this class is listed above
     
@@ -155,7 +163,15 @@ class Thread {
 
     int setPriority(int newPriority);  // return old priority value 
     int priority;
-    int arrivalTime;
+
+    int donatedPriority;
+    bool isDonated; // to indicate whether 
+                    // accept priroty donation or not
+    Thread *desiredJoin;
+    Lock *desiredLock;
+
+    void NotifyDesiredLockNewDonation();    // Used internally
+    void NotifyDesiredJoinNewDonation();    // by setEffectivePriority
 
 #ifdef USER_PROGRAM
 // A thread running a user program actually has *two* sets of CPU registers -- 
