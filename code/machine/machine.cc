@@ -62,12 +62,10 @@ Machine::Machine(bool debug)
     for (i = 0; i < MemorySize; i++)
       	mainMemory[i] = 0;
 #ifdef USE_TLB
-    tlb = new TranslationEntry[TLBSize];
-    for (i = 0; i < TLBSize; i++)
-	tlb[i].valid = FALSE;
+    tlbManager = new TLBManager(TLBSize);
     pageTable = NULL;
 #else	// use linear page table
-    tlb = NULL;
+    tlbManager = NULL;
     pageTable = NULL;
 #endif
 
@@ -83,8 +81,8 @@ Machine::Machine(bool debug)
 Machine::~Machine()
 {
     delete [] mainMemory;
-    if (tlb != NULL)
-        delete [] tlb;
+    if (tlbManager != NULL)
+        delete tlbManager;
 }
 
 //----------------------------------------------------------------------

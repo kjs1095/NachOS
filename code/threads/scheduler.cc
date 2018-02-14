@@ -238,6 +238,10 @@ Scheduler::Run (Thread *nextThread, bool finishing)
         oldThread->SaveUserState(); 	// save the user's CPU registers
 	oldThread->space->SaveState();
     }
+
+    if (kernel->machine->tlbManager != NULL) {
+        kernel->machine->tlbManager->CleanTLB();
+    }
 #endif
     
     oldThread->CheckOverflow();		    // check if the old thread

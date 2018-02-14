@@ -19,7 +19,6 @@
 #include "main.h"
 #include "addrspace.h"
 #include "machine.h"
-#include "noff.h"
 #include "framemanager.h"
 
 //----------------------------------------------------------------------
@@ -63,9 +62,13 @@ AddrSpace::AddrSpace()
 
 AddrSpace::~AddrSpace()
 {
-    for (int i = 0; i < numPages; ++i)
-        kernel->frameManager->Release(pageTable[i].physicalPage);
+    for (int i = 0; i < numPages; ++i) {
+        if (pageTable[i].valid) {
+            kernel->frameManager->Release(pageTable[i].physicalPage);
+        }
+    }
     delete[] pageTable;
+    delete executable;
 }
 
 
@@ -82,9 +85,8 @@ AddrSpace::~AddrSpace()
 bool 
 AddrSpace::Load(char *fileName) 
 {
-    OpenFile *executable = kernel->fileSystem->Open(fileName);
+    executable = kernel->fileSystem->Open(fileName);
     NoffHeader noffH;
-    unsigned int size;
 
     if (executable == NULL) {
 	cerr << "Unable to open file " << fileName << "\n";
@@ -102,11 +104,7 @@ AddrSpace::Load(char *fileName)
 			+ UserStackSize;	// we need to increase the size
 						// to leave room for the stack
     numPages = divRoundUp(size, PageSize);
-    size = numPages * PageSize; 
 
-    // TODO for now, just make allocation phase atomic to prevent deadlock
-    //      this problem can be resolved by virtual memory
-    IntStatus oldLevel = kernel->interrupt->SetLevel(IntOff);
     ASSERT(numPages <= kernel->frameManager->GetNumAvailFrames());
                         // check we're not trying
 						// to run anything too big --
@@ -118,36 +116,16 @@ AddrSpace::Load(char *fileName)
     pageTable = new TranslationEntry[numPages];
     for (int i = 0; i < numPages; i++) {
 	    pageTable[i].virtualPage = i;
-	    int frameNumber = kernel->frameManager->Acquire();
-        pageTable[i].physicalPage = frameNumber;
-
-        DEBUG(dbgAddr, fileName << " get frame id: " << frameNumber << "\n");
-
-	    pageTable[i].valid = TRUE;
+        pageTable[i].physicalPage = -1;
+	    pageTable[i].valid = FALSE;
 	    pageTable[i].use = FALSE;
 	    pageTable[i].dirty = FALSE;
 	    pageTable[i].readOnly = FALSE;
     }
 
-    (void) kernel->interrupt->SetLevel(oldLevel); 
+    codeSegment = noffH.code;
+    initDataSegment = noffH.initData;
 
-// then, copy in the code and data segments into memory
-    if (noffH.code.size > 0) {
-        DEBUG(dbgAddr, "Initializing code segment.");
-	DEBUG(dbgAddr, noffH.code.virtualAddr << ", " << noffH.code.size);
-
-        LoadSegment(executable, noffH.code.virtualAddr,
-                noffH.code.size, noffH.code.inFileAddr);
-    }
-    if (noffH.initData.size > 0) {
-        DEBUG(dbgAddr, "Initializing data segment.");
-	DEBUG(dbgAddr, noffH.initData.virtualAddr << ", " << noffH.initData.size);
-
-        LoadSegment(executable, noffH.initData.virtualAddr, 
-                noffH.initData.size, noffH.initData.inFileAddr);
-    }
-
-    delete executable;			// close file
     return TRUE;			// success
 }
 
@@ -233,36 +211,74 @@ void AddrSpace::SaveState()
 
 void AddrSpace::RestoreState() 
 {
+#ifdef USE_TLB
+    kernel->machine->pageTableSize = numPages;
+#else
     kernel->machine->pageTable = pageTable;
     kernel->machine->pageTableSize = numPages;
+#endif
 }
 
 //----------------------------------------------------------------------
-// AddrSpace::LoadSegment
-// 	Load a user program segement into memory from file.
+// AddrSpace::LoadPageFromDisk
+// 	Load a user program into memory from file.
 //
-//  "executable" is the open file object of executalbe file
-//  "fileAddr" is the address of segment in executable file
-//  "base" is the virtual address of segment
-//  "size" is the length of segement
+//  "vpn" is the virtual page number of desired page
+//  "ppn" is the frame to place data
 //----------------------------------------------------------------------
 
-void AddrSpace::LoadSegment(OpenFile* executable, int base, int size, int fileAddr) 
+TranslationEntry*
+AddrSpace::LoadPageFromDisk(int vpn, int ppn)
 {
-    int frameNumber, offset;
-    int virtualAddr, physicalAddr, len;
-    for (int pos = 0; pos < size; pos += len) {
-        virtualAddr = pos + base;
-        frameNumber = pageTable[ virtualAddr / PageSize ].physicalPage;
-        offset = virtualAddr % PageSize;
-        physicalAddr = frameNumber * PageSize + offset;
+    int physicalAddr, virtualAddr;
+    int codeLower, codeUpper;
+    int initDataLower, initDataUpper;
 
-        // calculate length of content can be written to this page
-        len = min( (virtualAddr/ PageSize +1) * PageSize - virtualAddr,
-                    size - pos);
+    physicalAddr = ppn * PageSize;
+    virtualAddr = vpn * PageSize;
 
-        executable->ReadAt(
-            &(kernel->machine->mainMemory[physicalAddr]),
-            len, fileAddr + pos);
+    pageTable[vpn].physicalPage = ppn;
+    bzero(kernel->machine->mainMemory + (ppn * PageSize),
+            PageSize);
+
+    codeLower = codeSegment.virtualAddr;
+    codeUpper = codeSegment.virtualAddr + codeSegment.size;
+    initDataLower = initDataSegment.virtualAddr;
+    initDataUpper = initDataSegment.virtualAddr + initDataSegment.size;
+
+    int written;
+    for (written = 0; written < PageSize; ++written) {
+        int currentAddr = virtualAddr + written;
+
+        if (codeLower <= currentAddr && currentAddr < codeUpper) {
+            executable->ReadAt(
+                &(kernel->machine->mainMemory[physicalAddr + written]),
+                1, codeSegment.inFileAddr + currentAddr - codeLower);
+        } else if (initDataLower <= currentAddr
+                        && currentAddr < initDataUpper) {
+            executable->ReadAt(
+                &(kernel->machine->mainMemory[physicalAddr + written]),
+                1, initDataSegment.inFileAddr + currentAddr - initDataLower);
+        }
     }
-} 
+
+    pageTable[vpn].valid = TRUE;
+    pageTable[vpn].dirty = FALSE;
+
+    return &pageTable[vpn];
+}
+
+//----------------------------------------------------------------------
+// AddrSpace::SyncPageAttributes
+// 	Synchronize attributes of corrosponding virtual page of TLB entry
+//
+//  "vpn" is the corrosponding index of the page corrosponding to TLB
+//  "entry" is the TLB entry
+//----------------------------------------------------------------------
+
+void
+AddrSpace::SyncPageAttributes(int vpn, TranslationEntry *entry)
+{
+    pageTable[vpn].dirty = entry->dirty;
+    pageTable[vpn].use = entry->use;
+}

@@ -24,6 +24,7 @@
 #include "copyright.h"
 #include "utility.h"
 #include "translate.h"
+#include "tlbmanager.h"
 
 // Definitions related to the size, and format of user memory
 
@@ -132,7 +133,7 @@ class Machine {
 // Thus the TLB pointer should be considered as *read-only*, although 
 // the contents of the TLB are free to be modified by the kernel software.
 
-    TranslationEntry *tlb;		// this pointer should be considered 
+    TLBManager *tlbManager; // this pointer should be considered
 					// "read-only" to Nachos kernel code
 
     TranslationEntry *pageTable;

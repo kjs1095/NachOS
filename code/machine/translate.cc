@@ -184,7 +184,6 @@ Machine::WriteMem(int addr, int size, int value)
 ExceptionType
 Machine::Translate(int virtAddr, int* physAddr, int size, bool writing)
 {
-    int i;
     unsigned int vpn, offset;
     TranslationEntry *entry;
     unsigned int pageFrame;
@@ -198,15 +197,15 @@ Machine::Translate(int virtAddr, int* physAddr, int size, bool writing)
     }
     
     // we must have either a TLB or a page table, but not both!
-    ASSERT(tlb == NULL || pageTable == NULL);	
-    ASSERT(tlb != NULL || pageTable != NULL);	
+    ASSERT(tlbManager == NULL || pageTable == NULL);
+    ASSERT(tlbManager != NULL || pageTable != NULL);
 
 // calculate the virtual page number, and offset within the page,
 // from the virtual address
     vpn = (unsigned) virtAddr / PageSize;
     offset = (unsigned) virtAddr % PageSize;
     
-    if (tlb == NULL) {		// => page table => vpn is index into table
+    if (tlbManager == NULL) {		// => page table => vpn is index into table
 	if (vpn >= pageTableSize) {
 	    DEBUG(dbgAddr, "Illegal virtual page # " << virtAddr);
 	    return AddressErrorException;
@@ -216,17 +215,15 @@ Machine::Translate(int virtAddr, int* physAddr, int size, bool writing)
 	}
 	entry = &pageTable[vpn];
     } else {
-        for (entry = NULL, i = 0; i < TLBSize; i++)
-    	    if (tlb[i].valid && (tlb[i].virtualPage == vpn)) {
-		entry = &tlb[i];			// FOUND!
-		break;
-	    }
+        // TODO boundary check
+        entry = tlbManager->FetchPageEntry(vpn);
 	if (entry == NULL) {				// not found
     	    DEBUG(dbgAddr, "Invalid TLB entry for this virtual page!");
     	    return PageFaultException;		// really, this is a TLB fault,
 						// the page may be in memory,
 						// but not in the TLB
 	}
+    kernel->stats->numTLBHit += 1;
     }
 
     if (entry->readOnly && writing) {	// trying to write to a read-only page
@@ -244,6 +241,7 @@ Machine::Translate(int virtAddr, int* physAddr, int size, bool writing)
     entry->use = TRUE;		// set the use, dirty bits
     if (writing)
 	entry->dirty = TRUE;
+    kernel->coreMapManager->SyncPage((int)pageFrame, (int)vpn, entry);
     *physAddr = pageFrame * PageSize + offset;
     ASSERT((*physAddr >= 0) && ((*physAddr + size) <= MemorySize));
     DEBUG(dbgAddr, "phys addr = " << *physAddr);

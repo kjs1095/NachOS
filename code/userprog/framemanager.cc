@@ -48,16 +48,14 @@ int FrameManager::Acquire()
 
 //----------------------------------------------------------------------
 // FrameManager::Release
-//  Atomically release a frame by frame id.
+//  Release a frame by frame id.
 //
 // "frameNumber" is the id of frame to be available
 //----------------------------------------------------------------------
 
 void FrameManager::Release(int frameNumber)
 {
-    lock->Acquire();
     frameUsageBitmap->Clear(frameNumber);
-    lock->Release();
 }
 
 //----------------------------------------------------------------------

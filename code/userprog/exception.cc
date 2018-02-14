@@ -63,6 +63,7 @@ ExceptionHandler(ExceptionType which)
     OpenFile *openFilePtr;
     OpenFileId userFd;
     int numBytesRW;
+    int virtualAddr, vpn;
 
     switch (which) {
 	case SyscallException:
@@ -251,6 +252,18 @@ ExceptionHandler(ExceptionType which)
  		    break;
 	    }
 	    break;
+    case PageFaultException:
+        virtualAddr = kernel->machine->ReadRegister(BadVAddrReg);
+        vpn = virtualAddr / PageSize;
+
+        if (debug->IsEnabled(dbgPage) || debug->IsEnabled(dbgAddr)) {
+            cerr << "Handle TLB miss on virtual page: "<< vpn << "\n";
+        }
+
+        kernel->coreMapManager->PushEntryToTLB(vpn);
+
+        kernel->stats->numTLBMiss += 1;
+        return;
 	default:
 	    cerr << "Unexpected user mode exception" << which << "\n";
 	    break;

@@ -15,6 +15,7 @@
 
 #include "copyright.h"
 #include "filesys.h"
+#include "noff.h"
 
 #define UserStackSize		1024 	// increase this as necessary!
 
@@ -29,6 +30,17 @@ class AddrSpace {
     void SaveState();			// Save/restore address space-specific
     void RestoreState();		// info on a context switch 
 
+    TranslationEntry *GetPageTableEntry(int vpn) {
+        return (&pageTable[vpn]);
+    }
+
+    TranslationEntry *LoadPageFromDisk(int vpn, int ppn);
+                    // Load specified virtual page into physical frame
+
+    void SyncPageAttributes(int vpn, TranslationEntry* entry);
+                    // Synchroize attributes of TLB entry and corrosponding
+                    // page entry
+
   private:
     TranslationEntry *pageTable;	// Assume linear page table translation
 					// for now!
@@ -41,7 +53,10 @@ class AddrSpace {
     void InitRegisters();		// Initialize user-level CPU registers,
 					// before jumping to user code
 
-    void LoadSegment(OpenFile *executable, int base, int size, int fileAddr);
+    OpenFile *executable;
+    unsigned int size;
+    Segment codeSegment;
+    Segment initDataSegment;
 };
 
 #endif // ADDRSPACE_H

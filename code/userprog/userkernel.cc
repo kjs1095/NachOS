@@ -52,6 +52,8 @@ UserProgKernel::Initialize()
     synchConsoleOutput = new SynchConsoleOutput(NULL);
 
     frameManager = new FrameManager(NumPhysPages);
+
+    coreMapManager = new CoreMapManager(NumPhysPages);
 }
 
 //----------------------------------------------------------------------
@@ -62,6 +64,7 @@ UserProgKernel::Initialize()
 
 UserProgKernel::~UserProgKernel()
 {
+    delete coreMapManager;
     delete frameManager;
     delete synchConsoleInput;
     delete synchConsoleOutput;

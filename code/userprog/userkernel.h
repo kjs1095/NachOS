@@ -15,6 +15,7 @@
 #include "kernel.h"
 #include "filesys.h"
 #include "machine.h"
+#include "coremapmanager.h"
  
 #define NumMaxUserProgram  5   // Maximum #user programs 
                             // can be executed in NachOS
@@ -44,6 +45,8 @@ class UserProgKernel : public ThreadedKernel {
     SynchConsoleOutput *synchConsoleOutput;
 
     FrameManager *frameManager;
+
+    CoreMapManager *coreMapManager;
 
   private:
     bool debugUserProg;		// single step user program

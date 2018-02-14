@@ -200,6 +200,9 @@ void Lock::Acquire()
     locked = TRUE;
     lockHolder = currentThread;
 
+    DEBUG(dbgSynch, "Lock: " << getName() << " is held by "
+                << currentThread->getName());
+
     // re-enable interrupt
     (void*) interrupt->SetLevel(oldLevel);
 }
@@ -230,6 +233,8 @@ void Lock::Release()
     lockHolder = NULL;
     locked = FALSE;
 
+    DEBUG(dbgSynch, "Lock: " << getName() << " is released");
+
     // re-enable interrupt
     (void*) interrupt->SetLevel(oldLevel);
 
@@ -259,7 +264,7 @@ void Lock::DonatePriorityToLockHolder(Thread* doner)
 bool Lock::CleanDonatedPriority()
 {
     DEBUG(dbgSynch, "Lock: " << this->getName() << ", "
-                << " reset donated priority of lock holder: " 
+                << "reset donated priority of lock holder: "
                 << lockHolder->getName());
 
     return lockHolder->resetEffectivePriority();
