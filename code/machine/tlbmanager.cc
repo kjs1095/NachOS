@@ -3,7 +3,7 @@
 
 #include "debug.h"
 #include "tlbmanager.h"
-#include "replacementFIFO.h"
+#include "replacementLRU.h"
 
 //----------------------------------------------------------------------
 // TLBManager::TLBManager
@@ -23,7 +23,7 @@ TLBManager::TLBManager(int size)
         tlb[i].dirty = FALSE;
     }
 
-    strategy = new ReplacementFIFO(size);
+    strategy = new ReplacementLRU(size);
 }
 
 //----------------------------------------------------------------------

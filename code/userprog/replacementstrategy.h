@@ -17,6 +17,7 @@
 
 class ReplacementStrategy {
   public:
+    virtual ~ReplacementStrategy() {}
     virtual int FindOneToReplace() = 0;
     virtual void UpdateElementWeight(int id) = 0;
     virtual void ResetStatus() = 0;

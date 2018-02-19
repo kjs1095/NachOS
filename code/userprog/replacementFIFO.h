@@ -14,7 +14,7 @@
 class ReplacementFIFO : public ReplacementStrategy {
   public:
     ReplacementFIFO(int size);
-    ~ReplacementFIFO() {}
+    virtual ~ReplacementFIFO() {}
 
     virtual int FindOneToReplace();
     virtual void UpdateElementWeight(int id) {}

@@ -92,6 +92,7 @@ USERPROG_H = ../userprog/addrspace.h\
     ../userprog/framemanager.h\
     ../userprog/replacementstrategy.h\
     ../userprog/replacementFIFO.h\
+    ../userprog/replacementLRU.h\
     ../userprog/coremapmanager.h\
         ../filesys/filesys.h\
         ../filesys/openfile.h\
@@ -106,6 +107,7 @@ USERPROG_C = ../userprog/addrspace.cc\
 	../userprog/synchconsole.cc\
     ../userprog/framemanager.cc\
     ../userprog/replacementFIFO.cc\
+    ../userprog/replacementLRU.cc\
     ../userprog/coremapmanager.cc\
 	../userprog/userkernel.cc\
         ../machine/console.cc\
@@ -115,7 +117,7 @@ USERPROG_C = ../userprog/addrspace.cc\
         ../machine/tlbmanager.cc
 
 USERPROG_O = addrspace.o exception.o synchconsole.o console.o framemanager.o \
-        replacementFIFO.o coremapmanager.o tlbmanager.o machine.o \
+        replacementFIFO.o replacementLRU.o coremapmanager.o tlbmanager.o machine.o \
         mipssim.o translate.o userkernel.o
 
 NETWORK_H = ../network/netkernel.h ../network/post.h ../machine/network.h
