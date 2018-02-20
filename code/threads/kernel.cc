@@ -47,6 +47,9 @@ ThreadedKernel::ThreadedKernel(int argc, char **argv)
             } else if (strcmp(argv[i +1], "ppri") == 0) {
                 schedulerType = Priority;
                 preemptive = TRUE;
+            } else if (strcmp(argv[i +1], "sjf") == 0) {
+                schedulerType = SJF;
+                preemptive = TRUE;
             } else {
                 ASSERTNOTREACHED();
             }

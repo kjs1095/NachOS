@@ -60,6 +60,9 @@ Thread::Thread(char* threadName, int priority, bool isJoinable)
     isDonated = FALSE;
     desiredJoin = NULL;
     desiredLock = NULL;
+
+    burstTime = 10;
+    startTicks = 0;
 #ifdef USER_PROGRAM
     space = NULL;
     for (int i = 0; i < MaxNumUserOpenFiles; ++i)
@@ -361,7 +364,7 @@ Thread::Finish ()
     ASSERT(this == kernel->currentThread);
     
     DEBUG(dbgThread, "Finishing thread: " << name);
-    
+
     if (isJoinable) {
         joinLock->Acquire();
         finishCalled = TRUE;
@@ -424,6 +427,13 @@ Thread::Yield ()
     
     nextThread = kernel->scheduler->FindNextToRun();
     if (nextThread != NULL && nextThread != this) {
+        int actualBurstTime = kernel->stats->userTicks - startTicks;
+        burstTime = (int)(alpha * (float)(actualBurstTime)
+                      + (1.0 - alpha) * (float)(burstTime));
+
+        DEBUG(dbgThread, "Acutal burst time: " << actualBurstTime);
+        DEBUG(dbgThread, "Predict next burst time: " << burstTime);
+
 	kernel->scheduler->ReadyToRun(this);
 	kernel->scheduler->Run(nextThread, FALSE);
     }
@@ -459,6 +469,13 @@ Thread::Sleep (bool finishing)
     ASSERT(kernel->interrupt->getLevel() == IntOff);
     
     DEBUG(dbgThread, "Sleeping thread: " << name);
+
+    int actualBurstTime = kernel->stats->userTicks - startTicks;
+    burstTime = (int)(alpha * (float)(actualBurstTime)
+                    + (1.0 - alpha) * (float)(burstTime));
+
+    DEBUG(dbgThread, "Acutal burst time: " << actualBurstTime);
+    DEBUG(dbgThread, "Predict next burst time: " << burstTime);
 
     status = BLOCKED;
     while ((nextThread = kernel->scheduler->FindNextToRun()) == NULL)

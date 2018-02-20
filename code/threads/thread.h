@@ -61,6 +61,9 @@
 const int StackSize = (4 * 1024);	// in words
 
 
+const float alpha = 0.5;    // factor of approximate SJF
+
+
 // Thread state
 enum ThreadStatus { JUST_CREATED, RUNNING, READY, BLOCKED };
 
@@ -139,6 +142,9 @@ class Thread {
     void setDesiredLock(Lock* desiredLock);
     void resetDesiredLock();
 
+    int getBurstTime() { return (burstTime); }
+    void setCPUBurstTicks(int _startTicks) { startTicks = _startTicks; }
+
   private:
     // some of the private data for this class is listed above
     
@@ -173,6 +179,8 @@ class Thread {
     void NotifyDesiredLockNewDonation();    // Used internally
     void NotifyDesiredJoinNewDonation();    // by setEffectivePriority
 
+    int burstTime;
+    int startTicks;
 #ifdef USER_PROGRAM
 // A thread running a user program actually has *two* sets of CPU registers -- 
 // one for its state while executing user code, one for its state 

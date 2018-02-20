@@ -77,6 +77,14 @@ EffectivePriorityComparator(Thread *a, Thread *b)
     else { return 0; }
 }
 
+static int
+CPUBurstTimeComparator(Thread *a, Thread *b)
+{
+    if (a->getBurstTime() < b->getBurstTime()) { return -1; }
+    else if (a->getBurstTime() > b->getBurstTime()) { return 1; }
+    else { return 0; }
+}
+
 static int 
 ThreadComparator(Thread *a, Thread *b)
 {   
@@ -92,6 +100,8 @@ ThreadComparator(Thread *a, Thread *b)
             return 0;
         case FCFS:  // First-Come-First-Serve
             return 0;
+        case SJF:
+            return CPUBurstTimeComparator(a, b);
         default:
             cerr << "Undefined scheduler type\n";
             break;
@@ -154,8 +164,7 @@ void
 Scheduler::ReadyToRun (Thread *thread)
 {
     ASSERT(kernel->interrupt->getLevel() == IntOff);
-    DEBUG(dbgThread, "Putting thread on ready list: " << thread->getName()
-                    << " with arrival time: " << kernel->stats->totalTicks);
+    DEBUG(dbgThread, "Putting thread on ready list: " << thread->getName());
 
     thread->setStatus(READY);
     readyList->Insert(thread);
@@ -251,6 +260,8 @@ Scheduler::Run (Thread *nextThread, bool finishing)
     nextThread->setStatus(RUNNING);      // nextThread is now running
     
     DEBUG(dbgThread, "Switching from: " << oldThread->getName() << " to: " << nextThread->getName());
+
+    nextThread->setCPUBurstTicks(kernel->stats->userTicks);
     
     // This is a machine-dependent assembly language routine defined 
     // in switch.s.  You may have to think
