@@ -23,8 +23,9 @@
 // of liability and disclaimer of warranty provisions.
 
 #include "copyright.h"
-
-#include "system.h"
+#include "debug.h"
+#include "main.h"
+#include "synchdisk.h"
 #include "filehdr.h"
 
 //----------------------------------------------------------------------
@@ -39,7 +40,7 @@
 //----------------------------------------------------------------------
 
 bool
-FileHeader::Allocate(BitMap *freeMap, int fileSize)
+FileHeader::Allocate(Bitmap *freeMap, int fileSize)
 { 
     numBytes = fileSize;
     numSectors  = divRoundUp(fileSize, SectorSize);
@@ -47,7 +48,7 @@ FileHeader::Allocate(BitMap *freeMap, int fileSize)
 	return FALSE;		// not enough space
 
     for (int i = 0; i < numSectors; i++)
-	dataSectors[i] = freeMap->Find();
+	dataSectors[i] = freeMap->FindAndSet();
     return TRUE;
 }
 
@@ -59,7 +60,7 @@ FileHeader::Allocate(BitMap *freeMap, int fileSize)
 //----------------------------------------------------------------------
 
 void 
-FileHeader::Deallocate(BitMap *freeMap)
+FileHeader::Deallocate(Bitmap *freeMap)
 {
     for (int i = 0; i < numSectors; i++) {
 	ASSERT(freeMap->Test((int) dataSectors[i]));  // ought to be marked!
@@ -77,7 +78,7 @@ FileHeader::Deallocate(BitMap *freeMap)
 void
 FileHeader::FetchFrom(int sector)
 {
-    synchDisk->ReadSector(sector, (char *)this);
+    kernel->synchDisk->ReadSector(sector, (char *)this);
 }
 
 //----------------------------------------------------------------------
@@ -90,7 +91,7 @@ FileHeader::FetchFrom(int sector)
 void
 FileHeader::WriteBack(int sector)
 {
-    synchDisk->WriteSector(sector, (char *)this); 
+    kernel->synchDisk->WriteSector(sector, (char *)this);
 }
 
 //----------------------------------------------------------------------
@@ -137,7 +138,7 @@ FileHeader::Print()
 	printf("%d ", dataSectors[i]);
     printf("\nFile contents:\n");
     for (i = k = 0; i < numSectors; i++) {
-	synchDisk->ReadSector(dataSectors[i], data);
+	kernel->synchDisk->ReadSector(dataSectors[i], data);
         for (j = 0; (j < SectorSize) && (k < numBytes); j++, k++) {
 	    if ('\040' <= data[j] && data[j] <= '\176')   // isprint(data[j])
 		printf("%c", data[j]);

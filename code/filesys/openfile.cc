@@ -14,7 +14,9 @@
 #include "copyright.h"
 #include "filehdr.h"
 #include "openfile.h"
-#include "system.h"
+#include "debug.h"
+#include "main.h"
+#include "synchdisk.h"
 
 //----------------------------------------------------------------------
 // OpenFile::OpenFile
@@ -130,7 +132,7 @@ OpenFile::ReadAt(char *into, int numBytes, int position)
     // read in all the full and partial sectors that we need
     buf = new char[numSectors * SectorSize];
     for (i = firstSector; i <= lastSector; i++)	
-        synchDisk->ReadSector(hdr->ByteToSector(i * SectorSize), 
+        kernel->synchDisk->ReadSector(hdr->ByteToSector(i * SectorSize), 
 					&buf[(i - firstSector) * SectorSize]);
 
     // copy the part we want
@@ -158,6 +160,7 @@ OpenFile::WriteAt(char *from, int numBytes, int position)
     numSectors = 1 + lastSector - firstSector;
 
     buf = new char[numSectors * SectorSize];
+    bzero(buf, numSectors * SectorSize);
 
     firstAligned = (position == (firstSector * SectorSize));
     lastAligned = ((position + numBytes) == ((lastSector + 1) * SectorSize));
@@ -174,7 +177,7 @@ OpenFile::WriteAt(char *from, int numBytes, int position)
 
 // write modified sectors back
     for (i = firstSector; i <= lastSector; i++)	
-        synchDisk->WriteSector(hdr->ByteToSector(i * SectorSize), 
+        kernel->synchDisk->WriteSector(hdr->ByteToSector(i * SectorSize), 
 					&buf[(i - firstSector) * SectorSize]);
     delete [] buf;
     return numBytes;

@@ -16,14 +16,25 @@
 #include "filesys.h"
 #include "machine.h"
 #include "coremapmanager.h"
- 
+
 #define NumMaxUserProgram  5   // Maximum #user programs 
                             // can be executed in NachOS
+#define MaxPathLen  255 // Maximum length of file path
 
 class SynchConsoleInput;
 class SynchConsoleOutput;
 
 class FrameManager;
+
+class SynchDisk;
+
+enum FsCmd {
+    UNUSED,
+    PUT,
+    LIST,
+    PRINT,
+    REMOVE
+};
 
 class UserProgKernel : public ThreadedKernel {
   public:
@@ -48,11 +59,20 @@ class UserProgKernel : public ThreadedKernel {
 
     CoreMapManager *coreMapManager;
 
+#ifdef FILESYS
+    SynchDisk *synchDisk;
+#endif // FILESYS
+
   private:
     bool debugUserProg;		// single step user program
     Thread *userThread[NumMaxUserProgram];
     char *executeFile[NumMaxUserProgram];
     int numUserProgram;
+
+    bool fileSysFormat;
+    FsCmd fsCmd;
+    char localPath[MaxPathLen +1];
+    char nachosPath[MaxPathLen +1];
 };
 
 #endif

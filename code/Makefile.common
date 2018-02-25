@@ -100,7 +100,9 @@ USERPROG_H = ../userprog/addrspace.h\
         ../machine/machine.h\
         ../machine/mipssim.h\
         ../machine/translate.h\
-        ../machine/tlbmanager.h
+        ../machine/tlbmanager.h\
+        ../filesys/synchdisk.h\
+        ../machine/disk.h
 
 USERPROG_C = ../userprog/addrspace.cc\
         ../userprog/exception.cc\
@@ -114,17 +116,35 @@ USERPROG_C = ../userprog/addrspace.cc\
         ../machine/machine.cc\
         ../machine/mipssim.cc\
         ../machine/translate.cc\
-        ../machine/tlbmanager.cc
+        ../machine/tlbmanager.cc\
+        ../filesys/synchdisk.cc\
+        ../machine/disk.cc\
 
 USERPROG_O = addrspace.o exception.o synchconsole.o console.o framemanager.o \
         replacementFIFO.o replacementLRU.o coremapmanager.o tlbmanager.o machine.o \
-        mipssim.o translate.o userkernel.o
+        mipssim.o translate.o userkernel.o synchdisk.o disk.o
 
 NETWORK_H = ../network/netkernel.h ../network/post.h ../machine/network.h
 
 NETWORK_C = ../network/netkernel.cc ../network/post.cc ../machine/network.cc
 
 NETWORK_O = netkernel.o post.o network.o
+
+FILESYS_H = ../filesys/directory.h\
+        ../filesys/filehdr.h\
+        ../filesys/filesys.h\
+        ../filesys/openfile.h\
+        ../filesys/pbitmap.h
+
+FILESYS_C = ../filesys/directory.cc\
+        ../filesys/filesys.cc\
+        ../filesys/openfile.cc\
+        ../filesys/filehdr.cc\
+        ../filesys/pbitmap.cc\
+        ../filesys/fstest.cc
+
+FILESYS_O = filehdr.o openfile.o filesys.o directory.o fstest.o\
+        pbitmap.o
 
 S_OFILES = switch.o
 

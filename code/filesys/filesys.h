@@ -73,6 +73,7 @@ class FileSystem {
     					// If "format", there is nothing on
 					// the disk, so initialize the directory
     					// and the bitmap of free blocks.
+    ~FileSystem();
 
     bool Create(char *name, int initialSize);  	
 					// Create a file (UNIX creat)
@@ -85,12 +86,19 @@ class FileSystem {
 
     void Print();			// List all the files and their contents
 
+    void Put(char *localPath, char *nachosPath);
+                    // Upload a file from Linux FS to NachOS FS
+
   private:
    OpenFile* freeMapFile;		// Bit map of free disk blocks,
 					// represented as a file
    OpenFile* directoryFile;		// "Root" directory -- list of 
 					// file names, represented as a file
 };
+
+extern void Copy(char *from, char *to);
+                    // Utility to Uploading a file from Linux FS to
+                    // NachOS Fs
 
 #endif // FILESYS
 

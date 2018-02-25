@@ -9,6 +9,7 @@
 #include "copyright.h"
 #include "synchconsole.h"
 #include "framemanager.h"
+#include "synchdisk.h"
 #include "userkernel.h"
 
 //----------------------------------------------------------------------
@@ -22,6 +23,8 @@ UserProgKernel::UserProgKernel(int argc, char **argv)
 {
     debugUserProg = FALSE;
     numUserProgram = 0;
+    fileSysFormat = FALSE;
+    fsCmd = UNUSED;
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-s") == 0) {
 	    debugUserProg = TRUE;
@@ -29,6 +32,21 @@ UserProgKernel::UserProgKernel(int argc, char **argv)
             ASSERT(i + 1 < argc);
             executeFile[numUserProgram] = argv[i +1];
             ++numUserProgram, ++i;
+        } else if (strcmp(argv[i], "-format") == 0) {
+            fileSysFormat = TRUE;
+        } else if (strcmp(argv[i], "-put") == 0) {
+            ASSERT(i + 2 < argc);
+            strcpy(localPath, argv[i +1]);
+            strcpy(nachosPath, argv[i +2]);
+            fsCmd = PUT;
+        } else if (strcmp(argv[i], "-ls") == 0) {
+            fsCmd = LIST;
+        } else if (strcmp(argv[i], "-rm") == 0) {
+            ASSERT(i +1 < argc);
+            strcpy(nachosPath, argv[i +1]);
+            fsCmd = REMOVE;
+        } else if (strcmp(argv[i], "-p") == 0) {
+            fsCmd = PRINT;
         } else if (strcmp(argv[i], "-u") == 0) {
             cout << "Partial usage: nachos [-s]\n";
 	}
@@ -46,7 +64,12 @@ UserProgKernel::Initialize()
     ThreadedKernel::Initialize();	// init multithreading
 
     machine = new Machine(debugUserProg);
+#ifdef FILESYS_STUB
     fileSystem = new FileSystem();
+#else
+    synchDisk = new SynchDisk("SynchDisk");
+    fileSystem = new FileSystem(fileSysFormat);
+#endif
 
     synchConsoleInput = NULL;
     synchConsoleOutput = new SynchConsoleOutput(NULL);
@@ -69,6 +92,9 @@ UserProgKernel::~UserProgKernel()
     delete synchConsoleInput;
     delete synchConsoleOutput;
     delete fileSystem;
+#ifdef FILESYS
+    delete synchDisk;
+#endif
     delete machine;
 }
 
@@ -91,7 +117,27 @@ ForkExecute(Thread *t)
 void
 UserProgKernel::Run()
 {
-    DEBUG(dbgThread, "#User Program: " << numUserProgram);
+ #ifdef FILESYS
+    switch (fsCmd) {
+        case PUT:
+            fileSystem->Put(localPath, nachosPath);
+            break;
+        case LIST:
+            fileSystem->List();
+            break;
+        case PRINT:
+            fileSystem->Print();
+            break;
+        case REMOVE:
+            fileSystem->Remove(nachosPath);
+        case UNUSED:
+            break;
+        defualt:
+            ASSERTNOTREACHED();
+            break;
+    }
+#endif
+   DEBUG(dbgThread, "#User Program: " << numUserProgram);
     for (int i = 0; i < numUserProgram; ++i) {
         userThread[i] = new Thread(executeFile[i]);
         userThread[i]->space = new AddrSpace();

@@ -15,7 +15,7 @@
 
 #include "copyright.h"
 #include "disk.h"
-#include "system.h"
+#include "main.h"
 
 // We put a magic number at the front of the UNIX file representing the
 // disk, to make it less likely we will accidentally treat a useful file 
@@ -119,13 +119,13 @@ Disk::ReadRequest(int sectorNumber, char* data)
     DEBUG(dbgDisk, "Reading from sector " << sectorNumber);
     Lseek(fileno, SectorSize * sectorNumber + MagicSize, 0);
     Read(fileno, data, SectorSize);
-    if (DebugIsEnabled('d'))
+    if (debug->IsEnabled('d'))
 	PrintSector(FALSE, sectorNumber, data);
     
     active = TRUE;
     UpdateLast(sectorNumber);
-    stats->numDiskReads++;
-    interrupt->Schedule(this, ticks, DiskInt);
+    kernel->stats->numDiskReads++;
+    kernel->interrupt->Schedule(this, ticks, DiskInt);
 }
 
 void
@@ -139,13 +139,13 @@ Disk::WriteRequest(int sectorNumber, char* data)
     DEBUG(dbgDisk, "Writing to sector " << sectorNumber);
     Lseek(fileno, SectorSize * sectorNumber + MagicSize, 0);
     WriteFile(fileno, data, SectorSize);
-    if (DebugIsEnabled('d'))
+    if (debug->IsEnabled('d'))
 	PrintSector(TRUE, sectorNumber, data);
     
     active = TRUE;
     UpdateLast(sectorNumber);
-    stats->numDiskWrites++;
-    interrupt->Schedule(this, ticks, DiskInt);
+    kernel->stats->numDiskWrites++;
+    kernel->interrupt->Schedule(this, ticks, DiskInt);
 }
 
 //----------------------------------------------------------------------
@@ -178,7 +178,7 @@ Disk::TimeToSeek(int newSector, int *rotation)
     int oldTrack = lastSector / SectorsPerTrack;
     int seek = abs(newTrack - oldTrack) * SeekTime;
 				// how long will seek take?
-    int over = (stats->totalTicks + seek) % RotationTime; 
+    int over = (kernel->stats->totalTicks + seek) % RotationTime; 
 				// will we be in the middle of a sector when
 				// we finish the seek?
 
@@ -229,7 +229,7 @@ Disk::ComputeLatency(int newSector, bool writing)
 {
     int rotation;
     int seek = TimeToSeek(newSector, &rotation);
-    int timeAfter = stats->totalTicks + seek + rotation;
+    int timeAfter = kernel->stats->totalTicks + seek + rotation;
 
 #ifndef NOTRACKBUF	// turn this on if you don't want the track buffer stuff
     // check if track buffer applies
@@ -260,7 +260,7 @@ Disk::UpdateLast(int newSector)
     int seek = TimeToSeek(newSector, &rotate);
     
     if (seek != 0)
-	bufferInit = stats->totalTicks + seek + rotate;
+	bufferInit = kernel->stats->totalTicks + seek + rotate;
     lastSector = newSector;
     DEBUG(dbgDisk, "Updating last sector = " << lastSector << " , " << bufferInit);
 }

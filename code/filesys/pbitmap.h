@@ -11,16 +11,19 @@
 
 #include "copyright.h"
 #include "bitmap.h"
+#include "openfile.h"
 
 // The following class defines a persistent bitmap.  It inherits all
 // the behavior of a bitmap (see bitmap.h), adding the ability to
 // be read from and stored to the disk.
 
-class PersistBitMap : public BitMap {
+class PersistBitMap : public Bitmap {
   public:
-    PersistBitMap(OpenFile *file, int numItems); // initialize bitmap from disk  
+    PersistBitMap(int numItems);
 
     ~PersistBitMap(); 			// deallocate bitmap
+
+    void FetchFrom(OpenFile *file);     // read bitmap contents from disk
 
     void WriteBack(OpenFile *file); 	// write bitmap contents to disk 
 };

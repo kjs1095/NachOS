@@ -90,7 +90,11 @@ ExceptionHandler(ExceptionType which)
                                 << arg1 << "\n");
 
                 kernel->machine->WriteRegister(2, -1);
+#ifdef FILESYS_STUB
             } else if (kernel->fileSystem->Create(buf) == TRUE) {
+#else
+            } else if (kernel->fileSystem->Create(buf, 30 * 128) == TRUE) {
+#endif
                 DEBUG(dbgAddr, "Create file: " << buf << " succeed.\n");
                 
                 kernel->machine->WriteRegister(2, 0);
