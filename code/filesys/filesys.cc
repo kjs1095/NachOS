@@ -207,11 +207,12 @@ FileSystem::Create(char *name, int initialSize)
             success = FALSE;		// no free block for file header 
         else if (!directory->Add(name, sector))
             success = FALSE;	// no space in directory
-	else {
+	    else {
     	    hdr = new FileHeader();
-	    if (!hdr->Allocate(freeMap, initialSize))
-            	success = FALSE;	// no space on disk for data
-	    else {	
+	    if (!hdr->Allocate(freeMap, initialSize)) {
+            success = FALSE;	// no space on disk for data
+	        hdr->Deallocate(freeMap);
+        } else {
 	    	success = TRUE;
 		// everthing worked, flush all changes back to disk
     	    	hdr->WriteBack(sector); 		
@@ -291,8 +292,8 @@ FileSystem::Remove(char *name)
     freeMap->Clear(sector);			// remove header block
     directory->Remove(name);
 
+    directory->WriteBack(directoryFile);    // flush to disk
     freeMap->WriteBack(freeMapFile);		// flush to disk
-    directory->WriteBack(directoryFile);        // flush to disk
     delete fileHdr;
     delete directory;
     delete freeMap;

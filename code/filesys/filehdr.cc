@@ -29,6 +29,32 @@
 #include "filehdr.h"
 
 //----------------------------------------------------------------------
+// FileHeader::FileHeader
+//  Initialize empty file header
+//----------------------------------------------------------------------
+
+FileHeader::FileHeader()
+{
+    numBytes = -1;
+    numSectors = -1;
+    nextFileHeaderSector = -1;
+    nextFileHeader = NULL;
+
+    bzero(dataSectors, sizeof(dataSectors));
+}
+
+//----------------------------------------------------------------------
+// FileHeader::~FileHeader
+//  Deallocate the file header data
+//----------------------------------------------------------------------
+
+FileHeader::~FileHeader()
+{
+    if (nextFileHeader != NULL)
+        delete nextFileHeader;
+}
+
+//----------------------------------------------------------------------
 // FileHeader::Allocate
 // 	Initialize a fresh file header for a newly created file.
 //	Allocate data blocks for the file out of the map of free disk blocks.
@@ -42,14 +68,32 @@
 bool
 FileHeader::Allocate(Bitmap *freeMap, int fileSize)
 { 
+    int numTotalSectors = divRoundUp(fileSize, SectorSize);
     numBytes = fileSize;
-    numSectors  = divRoundUp(fileSize, SectorSize);
+    numSectors  = min(numTotalSectors, (int)NumDirect);
     if (freeMap->NumClear() < numSectors)
 	return FALSE;		// not enough space
 
-    for (int i = 0; i < numSectors; i++)
-	dataSectors[i] = freeMap->FindAndSet();
-    return TRUE;
+    for (int i = 0; i < numSectors; i++) {
+	    dataSectors[i] = freeMap->FindAndSet();
+        if (dataSectors[i] == -1)
+            return FALSE;
+    }
+
+    if (numTotalSectors > NumDirect) {
+        nextFileHeaderSector = freeMap->FindAndSet();
+        if (nextFileHeaderSector == -1) {
+            return FALSE;
+        } else {
+            DEBUG(dbgFile, "Allocate next part of file header: " <<
+                                nextFileHeaderSector);
+            nextFileHeader = new FileHeader;
+            return nextFileHeader->Allocate(freeMap,
+                                            fileSize - MaxFileSize);
+        }
+    } else {
+        return TRUE;
+    }
 }
 
 //----------------------------------------------------------------------
@@ -62,6 +106,12 @@ FileHeader::Allocate(Bitmap *freeMap, int fileSize)
 void 
 FileHeader::Deallocate(Bitmap *freeMap)
 {
+    if (nextFileHeader != NULL) {
+        DEBUG(dbgFile, "Deallocate next part of file header: "
+                            << nextFileHeaderSector);
+        nextFileHeader->Deallocate(freeMap);
+    }
+
     for (int i = 0; i < numSectors; i++) {
 	ASSERT(freeMap->Test((int) dataSectors[i]));  // ought to be marked!
 	freeMap->Clear((int) dataSectors[i]);
@@ -78,7 +128,25 @@ FileHeader::Deallocate(Bitmap *freeMap)
 void
 FileHeader::FetchFrom(int sector)
 {
-    kernel->synchDisk->ReadSector(sector, (char *)this);
+    DEBUG(dbgFile, "Fetch file header data from sector: " << sector);
+    char buf[SectorSize];
+    kernel->synchDisk->ReadSector(sector, buf);
+
+    int offset = 0;
+    bcopy(buf + offset, &numBytes, sizeof(numBytes));
+    offset += sizeof(numBytes);
+    bcopy(buf + offset, &numSectors, sizeof(numSectors));
+    offset += sizeof(numSectors);
+    bcopy(buf + offset, &nextFileHeaderSector, sizeof(nextFileHeaderSector));
+    offset += sizeof(nextFileHeaderSector);
+    bcopy(buf + offset, dataSectors, numSectors * sizeof(int));
+
+    if (nextFileHeaderSector != -1) {
+        DEBUG(dbgFile, "Go to next file header part: "
+                            << nextFileHeaderSector);
+        nextFileHeader = new FileHeader;
+        nextFileHeader->FetchFrom(nextFileHeaderSector);
+    }
 }
 
 //----------------------------------------------------------------------
@@ -91,7 +159,26 @@ FileHeader::FetchFrom(int sector)
 void
 FileHeader::WriteBack(int sector)
 {
-    kernel->synchDisk->WriteSector(sector, (char *)this);
+    DEBUG(dbgFile, "Write file header to sector: " << sector);
+    char buf[SectorSize];
+    bzero(buf, SectorSize * sizeof(char));
+
+    int offset = 0;
+    bcopy(&numBytes, buf + offset, sizeof(numBytes));
+    offset += sizeof(numBytes);
+    bcopy(&numSectors, buf + offset, sizeof(numSectors));
+    offset += sizeof(numSectors);
+    bcopy(&nextFileHeaderSector, buf + offset, sizeof(nextFileHeaderSector));
+    offset += sizeof(nextFileHeaderSector);
+    bcopy(dataSectors, buf + offset, numSectors * sizeof(int));
+
+    kernel->synchDisk->WriteSector(sector, buf);
+
+    if (nextFileHeaderSector != -1) {
+        DEBUG(dbgFile, "Go to next part of file header: "
+                            << nextFileHeaderSector);
+        nextFileHeader->WriteBack(nextFileHeaderSector);
+    }
 }
 
 //----------------------------------------------------------------------
@@ -107,7 +194,10 @@ FileHeader::WriteBack(int sector)
 int
 FileHeader::ByteToSector(int offset)
 {
-    return(dataSectors[offset / SectorSize]);
+    if (offset >= MaxFileSize)
+        return nextFileHeader->ByteToSector(offset - MaxFileSize);
+    else
+        return dataSectors[ offset / SectorSize];
 }
 
 //----------------------------------------------------------------------
@@ -118,7 +208,10 @@ FileHeader::ByteToSector(int offset)
 int
 FileHeader::FileLength()
 {
-    return numBytes;
+    if (nextFileHeader != NULL)
+        return numBytes + nextFileHeader->FileLength();
+    else
+        return numBytes;
 }
 
 //----------------------------------------------------------------------
@@ -148,4 +241,7 @@ FileHeader::Print()
         printf("\n"); 
     }
     delete [] data;
+
+    if (nextFileHeader != NULL)
+        nextFileHeader->Print();
 }
