@@ -1,3 +1,3 @@
-filesys/Makefile linguist-vendored=true
-threads/Makefile linguist-vendored=true
-userprog/Makefile linguist-vendored=true
+code/filesys/Makefile linguist-vendored=true
+code/threads/Makefile linguist-vendored=true
+code/userprog/Makefile linguist-vendored=true
