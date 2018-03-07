@@ -1,0 +1,8 @@
+c++example/* linguist-vendored
+code/Makefile linguist-vendored
+code/bin/Makefile linguist-vendored
+code/threads/Makefile linguist-vendored
+code/test/Makefile linguist-vendored
+code/filesys/Makefile linguist-vendored
+code/network/Makefile linguist-vendored
+code/userprog/Makefile linguist-vendored
