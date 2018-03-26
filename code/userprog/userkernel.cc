@@ -39,7 +39,13 @@ UserProgKernel::UserProgKernel(int argc, char **argv)
             strcpy(localPath, argv[i +1]);
             strcpy(nachosPath, argv[i +2]);
             fsCmd = PUT;
+        } else if (strcmp(argv[i], "-mkdir") == 0) {
+            ASSERT(i +1 < argc);
+            strcpy(nachosPath, argv[i +1]);
+            fsCmd = MKDIR;
         } else if (strcmp(argv[i], "-ls") == 0) {
+            ASSERT(i +1 < argc);
+            strcpy(nachosPath, argv[i +1]);
             fsCmd = LIST;
         } else if (strcmp(argv[i], "-rm") == 0) {
             ASSERT(i +1 < argc);
@@ -47,6 +53,10 @@ UserProgKernel::UserProgKernel(int argc, char **argv)
             fsCmd = REMOVE;
         } else if (strcmp(argv[i], "-p") == 0) {
             fsCmd = PRINT;
+        } else if (strcmp(argv[i], "-cat") == 0) {
+            ASSERT(i +1 < argc);
+            fsCmd = CAT;
+            strcpy(nachosPath, argv[i +1]);
         } else if (strcmp(argv[i], "-u") == 0) {
             cout << "Partial usage: nachos [-s]\n";
 	}
@@ -122,14 +132,21 @@ UserProgKernel::Run()
         case PUT:
             fileSystem->Put(localPath, nachosPath);
             break;
+        case MKDIR:
+            fileSystem->Create(nachosPath, -1, TRUE);
+            break;
         case LIST:
-            fileSystem->List();
+            fileSystem->List(nachosPath);
             break;
         case PRINT:
             fileSystem->Print();
             break;
         case REMOVE:
             fileSystem->Remove(nachosPath);
+            break;
+        case CAT:
+            fileSystem->Print(nachosPath);
+            break;
         case UNUSED:
             break;
         defualt:

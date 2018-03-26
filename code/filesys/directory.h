@@ -31,6 +31,7 @@
 
 class DirectoryEntry {
   public:
+    bool isDir;             // Is this a sub-directory entry?
     bool inUse;				// Is this directory entry in use?
     int sector;				// Location on disk to find the 
 					//   FileHeader for this file 
@@ -61,15 +62,18 @@ class Directory {
     int Find(char *name);		// Find the sector number of the 
 					// FileHeader for file: "name"
 
-    bool Add(char *name, int newSector);  // Add a file name into the directory
+    bool Add(char *name, int newSector, bool isDir);  // Add a file name into the directory
 
     bool Remove(char *name);		// Remove a file from the directory
 
-    void List();			// Print the names of all the files
+    void List();
+                    // Print the names of all the files
 					//  in the directory
     void Print();			// Verbose print of the contents
 					//  of the directory -- all the file
 					//  names and their contents.
+
+    bool IsDir(char *name); // Verify the element with name in directory is directory or not
 
   private:
     int tableSize;			// Number of directory entries

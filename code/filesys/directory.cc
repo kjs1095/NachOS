@@ -128,19 +128,20 @@ Directory::Find(char *name)
 //
 //	"name" -- the name of the file being added
 //	"newSector" -- the disk sector containing the added file's header
+//  "isDir" -- file or subdirectory being added
 //----------------------------------------------------------------------
 
 bool
-Directory::Add(char *name, int newSector)
+Directory::Add(char *name, int newSector, bool isDir)
 { 
     if (FindIndex(name) != -1)
 	return FALSE;
-
     for (int i = 0; i < tableSize; i++)
         if (!table[i].inUse) {
             table[i].inUse = TRUE;
-            strncpy(table[i].name, name, FileNameMaxLen); 
+            strncpy(table[i].name, name, FileNameMaxLen);
             table[i].sector = newSector;
+            table[i].isDir = isDir;
         return TRUE;
 	}
     return FALSE;	// no space.  Fix when we have extensible files.
@@ -174,8 +175,10 @@ void
 Directory::List()
 {
    for (int i = 0; i < tableSize; i++)
-	if (table[i].inUse)
-	    printf("%s\n", table[i].name);
+	if (table[i].inUse) {
+	    if (table[i].isDir) printf("DIR  %s\n", table[i].name);
+        else                printf("FILE %s\n", table[i].name);
+    }
 }
 
 //----------------------------------------------------------------------
@@ -198,4 +201,23 @@ Directory::Print()
 	}
     printf("\n");
     delete hdr;
+}
+
+//----------------------------------------------------------------------
+// Directory::IsDir
+// 	Return TRUE if element with 'name' is directory.
+//  Return FALSE if element doesn't exist or isn't a file
+//
+//	"name" -- the file name to be verify
+//----------------------------------------------------------------------
+
+bool
+Directory::IsDir(char *name)
+{
+    int i = FindIndex(name);
+
+    if (i == -1)
+	    return FALSE;   // name not in directory
+
+    return table[i].isDir;
 }

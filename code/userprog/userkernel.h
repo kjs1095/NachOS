@@ -31,9 +31,11 @@ class SynchDisk;
 enum FsCmd {
     UNUSED,
     PUT,
+    MKDIR,
     LIST,
     PRINT,
-    REMOVE
+    REMOVE,
+    CAT
 };
 
 class UserProgKernel : public ThreadedKernel {

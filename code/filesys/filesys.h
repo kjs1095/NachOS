@@ -75,25 +75,31 @@ class FileSystem {
     					// and the bitmap of free blocks.
     ~FileSystem();
 
-    bool Create(char *name, int initialSize);  	
+    bool Create(char *path, int initialSize, bool isDir = FALSE);
 					// Create a file (UNIX creat)
 
-    OpenFile* Open(char *name); 	// Open a file (UNIX open)
+    OpenFile* Open(char *path); 	// Open a file (UNIX open)
 
     bool Remove(char *name);  		// Delete a file (UNIX unlink)
 
-    void List();			// List all the files in the file system
+    void List(char *path);			// List all the files in the file system
 
     void Print();			// List all the files and their contents
 
     void Put(char *localPath, char *nachosPath);
                     // Upload a file from Linux FS to NachOS FS
+    void Print(char *path); // Print content of file with specified path
 
   private:
    OpenFile* freeMapFile;		// Bit map of free disk blocks,
 					// represented as a file
    OpenFile* directoryFile;		// "Root" directory -- list of 
 					// file names, represented as a file
+
+   void GetLastElementOfPath(char *path, char *result);
+                    // Split and extract last string name of the path
+   OpenFile* FindSubDirectory(char *path);
+                    // Return openfile descriptor of bottom directory
 };
 
 extern void Copy(char *from, char *to);

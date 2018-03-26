@@ -63,8 +63,9 @@
 // supports extensible files, the directory size sets the maximum number 
 // of files that can be loaded onto the disk.
 #define FreeMapFileSize 	(NumSectors / BitsInByte)
-#define NumDirEntries 		10
+#define NumDirEntries 		64
 #define DirectoryFileSize 	(sizeof(DirectoryEntry) * NumDirEntries)
+#define PathMaxLen          255
 
 //----------------------------------------------------------------------
 // FileSystem::FileSystem
@@ -181,21 +182,31 @@ FileSystem::~FileSystem()
 //
 //	"name" -- name of file to be created
 //	"initialSize" -- size of file to be created
+//  "isDir" -- file or subdirectory to be created
 //----------------------------------------------------------------------
 
 bool
-FileSystem::Create(char *name, int initialSize)
+FileSystem::Create(char *path, int initialSize, bool isDir)
 {
     Directory *directory;
     PersistBitMap *freeMap;
     FileHeader *hdr;
+    char name[FileNameMaxLen +1];
     int sector;
     bool success;
 
-    DEBUG(dbgFile, "Creating file " << name << " size " << initialSize);
+    DEBUG(dbgFile, "Creating file " << path << " size " << initialSize);
+
+    if(isDir)   initialSize = DirectoryFileSize;
+
+    OpenFile *curDirectoryFile = FindSubDirectory(path);
+    if (curDirectoryFile == NULL)
+        return FALSE;    // path is illegal
 
     directory = new Directory(NumDirEntries);
-    directory->FetchFrom(directoryFile);
+    directory->FetchFrom(curDirectoryFile);
+    GetLastElementOfPath(path, name);
+    DEBUG(dbgFile, "Added File/Directory: " << name);
 
     if (directory->Find(name) != -1)
       success = FALSE;			// file is already in directory
@@ -203,26 +214,30 @@ FileSystem::Create(char *name, int initialSize)
         freeMap = new PersistBitMap(NumSectors);
         freeMap->FetchFrom(freeMapFile);
         sector = freeMap->FindAndSet();	// find a sector to hold the file header
-    	if (sector == -1) 		
+        if (sector == -1)
             success = FALSE;		// no free block for file header 
-        else if (!directory->Add(name, sector))
+        else if (!directory->Add(name, sector, isDir)) {
             success = FALSE;	// no space in directory
-	    else {
+            freeMap->Clear(sector);
+        } else {
     	    hdr = new FileHeader();
 	    if (!hdr->Allocate(freeMap, initialSize)) {
             success = FALSE;	// no space on disk for data
 	        hdr->Deallocate(freeMap);
+            freeMap->Clear(sector);
+            directory->Remove(name);
         } else {
 	    	success = TRUE;
 		// everthing worked, flush all changes back to disk
     	    	hdr->WriteBack(sector); 		
-    	    	directory->WriteBack(directoryFile);
+                directory->WriteBack(curDirectoryFile);
     	    	freeMap->WriteBack(freeMapFile);
 	    }
             delete hdr;
 	}
         delete freeMap;
     }
+    delete curDirectoryFile;
     delete directory;
     return success;
 }
@@ -234,21 +249,28 @@ FileSystem::Create(char *name, int initialSize)
 //	  Find the location of the file's header, using the directory 
 //	  Bring the header into memory
 //
-//	"name" -- the text name of the file to be opened
+//	"path" -- the path of the file to be opened
 //----------------------------------------------------------------------
 
 OpenFile *
-FileSystem::Open(char *name)
+FileSystem::Open(char *path)
 { 
     Directory *directory = new Directory(NumDirEntries);
     OpenFile *openFile = NULL;
     int sector;
 
-    DEBUG(dbgFile, "Opening file" << name);
-    directory->FetchFrom(directoryFile);
-    sector = directory->Find(name); 
-    if (sector >= 0) 		
-	openFile = new OpenFile(sector);	// name was found in directory 
+    DEBUG(dbgFile, "Opening file" << path);
+    OpenFile *curDirectoryFile = FindSubDirectory(path);
+    if (curDirectoryFile != NULL) {
+        directory->FetchFrom(curDirectoryFile);
+        char fileName[FileNameMaxLen +1];
+        GetLastElementOfPath(path, fileName);
+        sector = directory->Find(fileName);
+        if (sector >= 0 && !directory->IsDir(fileName))
+	        openFile = new OpenFile(sector);	// name was found in directory
+        delete curDirectoryFile;
+    }
+
     delete directory;
     return openFile;				// return NULL if not found
 }
@@ -264,21 +286,30 @@ FileSystem::Open(char *name)
 //	Return TRUE if the file was deleted, FALSE if the file wasn't
 //	in the file system.
 //
-//	"name" -- the text name of the file to be removed
+//	"path" -- the path of the file to be removed
 //----------------------------------------------------------------------
 
 bool
-FileSystem::Remove(char *name)
+FileSystem::Remove(char *path)
 { 
     Directory *directory;
     PersistBitMap *freeMap;
     FileHeader *fileHdr;
     int sector;
+    char fileName[FileNameMaxLen +1];
     
+    OpenFile *curDirectoryFile = FindSubDirectory(path);
+    if (curDirectoryFile == NULL)
+        return FALSE;    // path is illegal
+
     directory = new Directory(NumDirEntries);
-    directory->FetchFrom(directoryFile);
-    sector = directory->Find(name);
-    if (sector == -1) {
+    directory->FetchFrom(curDirectoryFile);
+    GetLastElementOfPath(path, fileName);
+    DEBUG(dbgFile, "Remove File: " << fileName);
+
+    sector = directory->Find(fileName);
+    if (sector == -1 || directory->IsDir(fileName)) {
+       delete curDirectoryFile;
        delete directory;
        return FALSE;			 // file not found 
     }
@@ -290,10 +321,11 @@ FileSystem::Remove(char *name)
 
     fileHdr->Deallocate(freeMap);  		// remove data blocks
     freeMap->Clear(sector);			// remove header block
-    directory->Remove(name);
+    directory->Remove(fileName);
 
-    directory->WriteBack(directoryFile);    // flush to disk
+    directory->WriteBack(curDirectoryFile);    // flush to disk
     freeMap->WriteBack(freeMapFile);		// flush to disk
+    delete curDirectoryFile;
     delete fileHdr;
     delete directory;
     delete freeMap;
@@ -303,15 +335,43 @@ FileSystem::Remove(char *name)
 //----------------------------------------------------------------------
 // FileSystem::List
 // 	List all the files in the file system directory.
+//
+// "path" -- the path of file/directory to be listed
 //----------------------------------------------------------------------
 
 void
-FileSystem::List()
+FileSystem::List(char *path)
 {
     Directory *directory = new Directory(NumDirEntries);
+    OpenFile *curDirectoryFile;
+    int sector = -1;
 
-    directory->FetchFrom(directoryFile);
-    directory->List();
+    DEBUG(dbgFile, "List file/directory: " << path);
+    if (strcmp(path, "/") == 0) {
+        sector = DirectorySector;
+    } else {
+        curDirectoryFile = FindSubDirectory(path);
+        char name[FileNameMaxLen +1];
+        GetLastElementOfPath(path, name);
+        if (curDirectoryFile != NULL) {
+            directory->FetchFrom(curDirectoryFile); 
+            sector = directory->Find(name);
+            if (sector != -1 && !directory->IsDir(name)) {
+                printf("FILE %s\n", name);
+                sector = -1;
+            }
+
+            delete curDirectoryFile;
+        }
+    }
+
+    if (sector != -1) {
+        curDirectoryFile = new OpenFile(sector);
+        directory->FetchFrom(curDirectoryFile);
+        directory->List();
+        delete curDirectoryFile;
+    }
+
     delete directory;
 }
 
@@ -354,6 +414,38 @@ FileSystem::Print()
 }
 
 //----------------------------------------------------------------------
+// FileSystem::Print
+// 	Print contents of the file with specified path
+//
+// "path" -- the path of file to be printed
+//----------------------------------------------------------------------
+
+void
+FileSystem::Print(char *path)
+{
+    DEBUG(dbgFile, "Print content of file: " << path);
+    OpenFile *curDirectoryFile = FindSubDirectory(path);
+    if (curDirectoryFile == NULL)
+        return;
+
+    char fileName[FileNameMaxLen +1];
+    GetLastElementOfPath(path, fileName);
+    Directory *directory = new Directory(NumDirEntries);
+    directory->FetchFrom(directoryFile);
+    int sector = directory->Find(fileName);
+
+    if (sector != -1 && !directory->IsDir(fileName)) {
+        FileHeader *hdr = new FileHeader;
+        hdr->FetchFrom(sector);
+        hdr->Print();
+        delete hdr;
+    }
+
+    delete directory;
+    delete curDirectoryFile;
+}
+
+//----------------------------------------------------------------------
 // FileSystem::Put
 // 	Move the file from Linux FS to NachOS FS
 //
@@ -365,4 +457,90 @@ void
 FileSystem::Put(char *localPath, char *nachosPath)
 {
     Copy(localPath, nachosPath);
+}
+
+//----------------------------------------------------------------------
+// FileSystem::GetLastElementOfPath
+//  Split path string by '/', copy last element to result variable
+//
+// "path" - the source path
+// "result" - pointer to store result
+//----------------------------------------------------------------------
+
+void
+FileSystem::GetLastElementOfPath(char *path, char *result)
+{
+    char tmpPath[PathMaxLen +1];
+    strcpy(tmpPath, path);
+    char parent[] = "/";
+    char *child = strtok(tmpPath, "/");
+
+    while (child != NULL) {
+        sscanf(child, "%s", parent);
+        child = strtok(NULL, "/");
+    }
+    strcpy(result, parent);
+
+    DEBUG(dbgFile, "Last element of path: " << result);
+}
+
+//----------------------------------------------------------------------
+// FileSystem::FindSubDirectory
+//  Return open file descriptor of lowest directory
+//  1.  Read directory file
+//  2.  Find next level file or directory
+//  3a. Break when the name of next level doesn't exist
+//   b. Or move on to next level
+//  4.  Break when next level is file
+//
+//  Clean data if (1) file/dir doesn't not exist (2) not last element
+//
+// case 1: /dir1/dir2/file
+// case 2: /dir1/dir2
+// case 3: /
+// case 4: /file
+// case 5: /dir1/file/dir2
+// 
+// "path" - the source path
+//----------------------------------------------------------------------
+
+OpenFile*
+FileSystem::FindSubDirectory(char *path)
+{
+    Directory *directory = new Directory(NumDirEntries);
+    OpenFile* curDirectoryFile = NULL;
+    int sector = DirectorySector;
+    char tmpPath[PathMaxLen +1];
+    strcpy(tmpPath, path);
+    char parent[FileNameMaxLen +1] = "/";
+    char *child = strtok(tmpPath, "/");
+
+    while (child != NULL) {
+        char *next = strtok(NULL, "/");
+        curDirectoryFile = new OpenFile(sector);
+        if (next == NULL)
+            break;
+
+        directory->FetchFrom(curDirectoryFile);
+        sector = directory->Find(child);
+        if (sector == -1)
+            break;
+
+        strcpy(parent, child);
+        child = next;
+
+        if (!directory->IsDir(parent))
+            break;
+
+        delete curDirectoryFile;    // prevent memory leak
+    }
+
+    if (sector == -1 || (strcmp(parent, "/") != 0 && !directory->IsDir(parent))) {
+        if (curDirectoryFile != NULL)
+            delete curDirectoryFile;
+        curDirectoryFile = NULL;
+    }
+
+    delete directory;
+    return curDirectoryFile;
 } 
